@@ -9,8 +9,8 @@ def criar_banco_dados():
     with sqlite3.connect(db_name) as conn:
         cursor = conn.cursor()
         
-        # 1. Criação das Tabelas
-        cursor.execute("CREATE TABLE usuarios (id INTEGER PRIMARY KEY, usuario TEXT, senha TEXT)")
+        # 1. Tabelas com Sistema de Permissões
+        cursor.execute("CREATE TABLE usuarios (id INTEGER PRIMARY KEY, usuario TEXT UNIQUE, senha TEXT, perfil TEXT)")
         cursor.execute("CREATE TABLE antibioticos (id INTEGER PRIMARY KEY, nome TEXT, classe TEXT, vias TEXT, tempo_tto_padrao TEXT, dose_ataque TEXT, dose_padrao TEXT, cuidados_pkpd TEXT, focos_compativeis TEXT)")
         cursor.execute("CREATE TABLE regras_renais (id INTEGER PRIMARY KEY, antibiotico_id INTEGER, faixa_nome TEXT, clcr_min REAL, clcr_max REAL, conduta TEXT)")
         cursor.execute("CREATE TABLE interacoes_db (id INTEGER PRIMARY KEY, farmaco_a TEXT, farmaco_b TEXT, gravidade TEXT, detalhe TEXT)")
@@ -18,10 +18,11 @@ def criar_banco_dados():
         cursor.execute("CREATE TABLE interacoes_doenca (id INTEGER PRIMARY KEY, termo_farmaco TEXT, comorbidade TEXT, alerta TEXT)")
         cursor.execute("CREATE TABLE alergias_cruzadas (id INTEGER PRIMARY KEY, classe_alergia TEXT, farmaco_prescrito TEXT, risco TEXT)")
         
-        # 2. Utilizador de Acesso
-        cursor.execute("INSERT INTO usuarios (usuario, senha) VALUES ('farmacia', 'radar2026')")
+        # 2. Utilizadores (Administrador e Padrão)
+        cursor.execute("INSERT INTO usuarios (usuario, senha, perfil) VALUES ('noberto', 'radar2026', 'admin')")
+        cursor.execute("INSERT INTO usuarios (usuario, senha, perfil) VALUES ('farmacia', 'radar2026', 'user')")
 
-        # 3. Antimicrobianos Essenciais (Foco Enfermaria)
+        # 3. Antimicrobianos (Foco Enfermaria)
         atbs = [
             ("Ceftriaxona (Rocefin)", "Cefalosporina 3ª Ger.", "EV / IM", "5-7d", "1g a 2g", "1g a 2g 24/24h", "Sem ajuste para ClCr isolado. Evitar Ringer Lactato simultâneo.", "PAC, ITU", [("Qualquer", 0, 999, "1g a 2g EV 24/24h"), ("HDI", -1, -1, "Manter dose plena")]),
             ("Azitromicina (Zithromax)", "Macrolídeo", "EV / VO", "3-5d", "500mg", "500mg 24/24h", "Não requer ajuste renal. Risco de QTc.", "PAC, Exacerbação DPOC", [("Qualquer", 0, 999, "500mg 24/24h"), ("HDI", -1, -1, "Manter dose plena")]),
@@ -59,19 +60,19 @@ def criar_banco_dados():
         ]
         for fa, fb, grav, det in interacoes: cursor.execute("INSERT INTO interacoes_db (farmaco_a, farmaco_b, gravidade, detalhe) VALUES (?,?,?,?)", (fa, fb, grav, det))
 
-        # 6. Interações Fármaco x Doença (Comorbilidades)
+        # 6. Interações Fármaco x Doença
         doencas = [
-            ("cetoprofeno", "icc", "ALERTA CARDIOLÓGICO: AINEs em Insuficiência Cardíaca precipitam retenção hídrica e Edema Agudo de Pulmão."),
-            ("ibuprofeno", "icc", "ALERTA CARDIOLÓGICO: AINEs em Insuficiência Cardíaca precipitam retenção hídrica."),
-            ("diclofenaco", "icc", "ALERTA CARDIOLÓGICO: AINEs em Insuficiência Cardíaca precipitam retenção hídrica e EAP."),
-            ("propranolol", "asma", "ALERTA PNEUMOLÓGICO: Betabloqueadores não-seletivos podem induzir broncoespasmo severo em asmáticos/DPOC."),
+            ("cetoprofeno", "icc", "ALERTA CARDIOLÓGICO: AINEs em ICC precipitam retenção hídrica e Edema Agudo de Pulmão."),
+            ("ibuprofeno", "icc", "ALERTA CARDIOLÓGICO: AINEs em ICC precipitam retenção hídrica."),
+            ("diclofenaco", "icc", "ALERTA CARDIOLÓGICO: AINEs em ICC precipitam retenção hídrica e EAP."),
+            ("propranolol", "asma", "ALERTA PNEUMOLÓGICO: Betabloqueadores não-seletivos induzem broncoespasmo em asmáticos/DPOC."),
             ("carvedilol", "asma", "ALERTA PNEUMOLÓGICO: Pode piorar a reatividade brônquica no DPOC/Asma."),
-            ("cefepima", "epilepsia", "ALERTA NEUROLÓGICO: Risco aumentado de rebaixamento do limiar convulsivo e status epilepticus."),
-            ("meropenem", "epilepsia", "ALERTA NEUROLÓGICO: Risco de neurotoxicidade e crises convulsivas de escape."),
-            ("ciprofloxacino", "epilepsia", "ALERTA NEUROLÓGICO: Quinolonas podem precipitar crises em doentes epiléticos."),
-            ("metronidazol", "hepatopatia", "ALERTA HEPÁTICO: Disfunção hepática grave (Child-Pugh C) requer aumento do intervalo do Metronidazol para 12/12h."),
-            ("clindamicina", "hepatopatia", "ALERTA HEPÁTICO: Em hepatopatia grave, meia-vida é muito prolongada. Ajustar posologia."),
-            ("fluconazol", "hepatopatia", "ALERTA HEPÁTICO: Risco de agravamento da lesão hepática. Monitorizar transaminases de perto.")
+            ("cefepima", "epilepsia", "ALERTA NEUROLÓGICO: Risco de rebaixamento do limiar convulsivo."),
+            ("meropenem", "epilepsia", "ALERTA NEUROLÓGICO: Risco de neurotoxicidade e crises de escape."),
+            ("ciprofloxacino", "epilepsia", "ALERTA NEUROLÓGICO: Quinolonas precipitam crises em epiléticos."),
+            ("metronidazol", "hepatopatia", "ALERTA HEPÁTICO: Disfunção hepática grave requer aumento do intervalo para 12/12h."),
+            ("clindamicina", "hepatopatia", "ALERTA HEPÁTICO: Meia-vida prolongada em hepatopatia. Ajustar posologia."),
+            ("fluconazol", "hepatopatia", "ALERTA HEPÁTICO: Risco de agravamento da lesão hepática. Monitorizar transaminases.")
         ]
         for f, c, a in doencas: cursor.execute("INSERT INTO interacoes_doenca (termo_farmaco, comorbidade, alerta) VALUES (?,?,?)", (f, c, a))
 
@@ -84,7 +85,7 @@ def criar_banco_dados():
         for ac, fp, r in alergias: cursor.execute("INSERT INTO alergias_cruzadas (classe_alergia, farmaco_prescrito, risco) VALUES (?,?,?)", (ac, fp, r))
 
         conn.commit()
-        print("Banco 'clinica.db' gerado com SUCESSO! Inclui Doenças, Alergias e Hepatopatia.")
+        print("Banco 'clinica.db' gerado com sucesso! Administrador cadastrado.")
 
 if __name__ == "__main__":
     criar_banco_dados()
