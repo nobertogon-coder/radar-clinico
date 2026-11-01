@@ -19,8 +19,11 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 app = FastAPI(title="Radar Clínico")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+# Imagem de fallback caso o ficheiro não seja encontrado (Base64 simplificado da logo)
+LOGO_BASE64 = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMEU3NDkwIiBzdHJva2Utd2lkdGg9IjgiIHN0cm9rZS1kYXNoYXJyYXk9IjEwIDEwIi8+PHJlY3QgeD0iNDAiIHk9IjQwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9IiMwNkI2RDQiIHJ4PSI1Ii8+PC9zdmc+"
+
 # ==========================================
-# 1. AUTENTICAÇÃO E LOGIN (ESTILO BEERS)
+# 1. AUTENTICAÇÃO E LOGIN
 # ==========================================
 def obter_usuario_logado(request: Request):
     token = request.cookies.get("session_token")
@@ -36,7 +39,7 @@ async def login_page(request: Request, erro: str = ""):
     if obter_usuario_logado(request): 
         return RedirectResponse("/dashboard", 302)
     
-    msg_erro = f"<div class='alert alert-danger p-2 small mb-3' style='border-radius:8px;'>{erro}</div>" if erro else ""
+    msg_erro = f"<div class='alert alert-danger p-2 small mb-3 text-center' style='border-radius:6px;'>{erro}</div>" if erro else ""
     
     return HTMLResponse(f"""
     <!DOCTYPE html>
@@ -46,29 +49,29 @@ async def login_page(request: Request, erro: str = ""):
         <title>Login | Radar Clínico</title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
         <style>
-            body {{ background-color: #374151; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: -apple-system, sans-serif; }}
-            .login-card {{ background: #ffffff; border-radius: 12px; padding: 3rem 2.5rem; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; }}
-            .logo-box {{ background-color: #F8FAFC; border-radius: 16px; width: 130px; height: 130px; margin: 0 auto 1.2rem auto; display: flex; align-items: center; justify-content: center; overflow: hidden; }}
-            .logo-box img {{ max-width: 100%; max-height: 100%; object-fit: contain; }}
-            .badge-acesso {{ background-color: #E0F2FE; color: #0E7490; font-weight: 700; font-size: 0.8rem; padding: 0.5rem 1.2rem; border-radius: 20px; margin-bottom: 2rem; display: inline-block; letter-spacing: 0.5px; border: 1px solid #BAE6FD; }}
-            .form-label-custom {{ text-align: left; display: block; font-size: 0.75rem; font-weight: 700; color: #64748B; margin-bottom: 0.4rem; text-transform: uppercase; }}
-            .form-control-custom {{ border-radius: 8px; border: 1px solid #CBD5E1; padding: 0.7rem 1rem; margin-bottom: 1.2rem; width: 100%; background: #F8FAFC; }}
-            .form-control-custom:focus {{ border-color: #0E7490; outline: none; background: #fff; box-shadow: 0 0 0 3px rgba(14,116,144, 0.1); }}
-            .btn-login {{ background-color: #0E7490; color: white; font-weight: 600; border: none; border-radius: 8px; padding: 0.8rem; width: 100%; transition: 0.2s; }}
+            body {{ background-color: #4B5563; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+            .login-card {{ background: #ffffff; border-radius: 12px; padding: 2.5rem; width: 100%; max-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }}
+            .logo-box {{ background-color: #F8FAFC; border-radius: 12px; width: 110px; height: 110px; margin: 0 auto 1rem auto; display: flex; align-items: center; justify-content: center; overflow: hidden; }}
+            .logo-box img {{ max-width: 80%; max-height: 80%; object-fit: contain; }}
+            .badge-acesso {{ background-color: #F0FDFA; color: #0E7490; font-weight: 700; font-size: 0.7rem; padding: 0.4rem 1rem; border-radius: 20px; margin-bottom: 1.5rem; display: block; width: fit-content; margin-left: auto; margin-right: auto; border: 1px solid #CCFBF1; letter-spacing: 0.5px; }}
+            .form-label-custom {{ text-align: left; display: block; font-size: 0.75rem; font-weight: 700; color: #475569; margin-bottom: 0.3rem; text-transform: uppercase; }}
+            .form-control-custom {{ border-radius: 6px; border: 1px solid #CBD5E1; padding: 0.6rem 0.8rem; margin-bottom: 1.2rem; width: 100%; font-size: 0.95rem; }}
+            .form-control-custom:focus {{ border-color: #0E7490; outline: none; box-shadow: 0 0 0 3px rgba(14,116,144, 0.1); }}
+            .btn-login {{ background-color: #0E7490; color: white; font-weight: 600; font-size: 0.9rem; border: none; border-radius: 6px; padding: 0.7rem; width: 100%; margin-top: 0.5rem; transition: 0.2s; }}
             .btn-login:hover {{ background-color: #06B6D4; color: white; }}
         </style>
     </head>
     <body>
         <div class="login-card">
             <div class="logo-box">
-                <img src="/static/logo.jpg" alt="Logo">
+                <img src="/static/logo.jpg" alt="Logo" onerror="this.onerror=null; this.src='{LOGO_BASE64}';">
             </div>
             <div class="badge-acesso">ACESSO FARMACÊUTICO</div>
             {msg_erro}
             <form action="/login" method="post" style="text-align: left;">
-                <label class="form-label-custom">Usuário</label>
+                <label class="form-label-custom">USUÁRIO</label>
                 <input type="text" name="usuario" class="form-control-custom" placeholder="admin" required>
-                <label class="form-label-custom">Senha</label>
+                <label class="form-label-custom">SENHA</label>
                 <input type="password" name="senha" class="form-control-custom" placeholder="••••••••" required>
                 <button type="submit" class="btn-login">Entrar no Sistema</button>
             </form>
@@ -88,7 +91,7 @@ async def processar_login(usuario: str = Form(...), senha: str = Form(...)):
             return res
         return RedirectResponse("/?erro=Credenciais+inválidas", 302)
     except Exception:
-        return RedirectResponse("/?erro=Erro+no+servidor", 302)
+        return RedirectResponse("/?erro=Erro+de+conexão+com+o+banco", 302)
 
 @app.get("/logout")
 async def logout():
@@ -97,7 +100,7 @@ async def logout():
     return res
 
 # ==========================================
-# 2. MOTOR CLÍNICO E LEITOR DE PDF
+# 2. MOTOR CLÍNICO E PDF (SEPARAÇÃO ATB vs GERAL)
 # ==========================================
 def extrair_texto_pdf(arquivo_bytes: bytes):
     try:
@@ -109,16 +112,21 @@ def extrair_texto_pdf(arquivo_bytes: bytes):
             lista_atbs = conn.cursor().execute("SELECT id, nome FROM antibioticos").fetchall()
             outros = [r[0].lower() for r in conn.cursor().execute("SELECT DISTINCT farmaco_a FROM interacoes_db UNION SELECT DISTINCT farmaco_b FROM interacoes_db UNION SELECT farmaco FROM interacoes_alimento UNION SELECT termo_farmaco FROM interacoes_doenca").fetchall()]
         
-        achados, achados_ids = [], []
+        achados_geral, achados_atb_ids = [], []
+        
+        # Procura Antibióticos
         for atb_id, atb_nome in lista_atbs:
             nm = atb_nome.split("(")[0].strip().lower()
             if nm in palavras_texto: 
-                achados.append(atb_nome.title())
-                achados_ids.append(atb_id)
+                achados_atb_ids.append(atb_id)
+                # Não adiciona o ATB na lista geral agora, pois ele já vai para o Slot
                 
+        # Procura outros medicamentos (Lista Geral)
         for farmaco in outros:
-            if farmaco in palavras_texto and farmaco.title() not in achados: achados.append(farmaco.title())
-        return achados_ids[:4], ", ".join(achados)
+            if farmaco in palavras_texto and farmaco.title() not in achados_geral: 
+                achados_geral.append(farmaco.title())
+                
+        return achados_atb_ids[:4], ", ".join(achados_geral)
     except Exception: return [], ""
 
 def checar_alertas_multiplos(farmacos: list, comorbs: list, alergia: str):
@@ -145,15 +153,14 @@ def checar_alertas_multiplos(farmacos: list, comorbs: list, alergia: str):
     return interacoes, list(set(alertas_clinicos)), list(set(alertas_alergia))
 
 # ==========================================
-# 3. INTERFACE PRINCIPAL (LAYOUT RADAR BEERS)
+# 3. INTERFACE DASHBOARD (LAYOUT TOPBAR IDÊNTICA)
 # ==========================================
 def gerar_html_dashboard(usuario, perfil, antibioticos=None, preenchimento_pdf="", pdf_atbs=None, resultado=None, aba_admin=False, msg_admin=""):
     pdf_atbs = pdf_atbs or []
     antibioticos = antibioticos or []
     clcr_display = f"{resultado['clcr']}" if resultado else "--"
-    status_display = f"{len(resultado['interacoes'])} Alertas" if resultado else "0 Alertas"
+    status_display = f"{len(resultado['interacoes'])}" if resultado else "0"
     
-    # Seção Admin ou Formulário Clínico
     if aba_admin:
         with sqlite3.connect(DB_FILE) as conn:
             lista_users = conn.cursor().execute("SELECT id, usuario, perfil FROM usuarios").fetchall()
@@ -174,7 +181,7 @@ def gerar_html_dashboard(usuario, perfil, antibioticos=None, preenchimento_pdf="
                             <option value="user">Padrão (Farmácia)</option>
                             <option value="admin">Administrador</option>
                         </select>
-                        <button type="submit" class="btn btn-radar w-100">Cadastrar Acesso</button>
+                        <button type="submit" class="btn btn-radar w-100 fw-bold">CADASTRAR</button>
                     </form>
                 </div>
                 <div class="col-md-8">
@@ -197,7 +204,7 @@ def gerar_html_dashboard(usuario, perfil, antibioticos=None, preenchimento_pdf="
                 op += f'<option value="{a[0]}" data-nome="{a[1]}" {sel}>{a[1]} ({a[2]})</option>'
             slots_atb += f'<div class="row g-2 mb-2"><div class="col-md-8"><select name="atb_id_{i}" class="select-search slot-atb">{op}</select></div><div class="col-md-4"><input type="text" name="dose_{i}" class="form-control form-control-sm" placeholder="Ex: 1g EV 8/8h"></div></div>'
 
-        painel_resultado = '<div class="text-center text-muted p-5 bg-light rounded" style="border: 1px dashed #cbd5e1;">Nenhuma triagem realizada ainda.</div>'
+        painel_resultado = '<div class="text-center text-muted p-5 bg-light rounded" style="border: 1px dashed #cbd5e1;">Nenhuma avaliação realizada ainda.</div>'
         if resultado:
             alertas = ""
             for a in resultado.get("alertas_dieta", []): alertas += f"<div class='alert alert-warning p-2 small mb-2'><strong>Nutrição:</strong> {a}</div>"
@@ -208,32 +215,32 @@ def gerar_html_dashboard(usuario, perfil, antibioticos=None, preenchimento_pdf="
 
         conteudo_corpo = f"""
         <div class="row g-4 mb-4">
-            <!-- COLUNA 1: PACIENTE -->
+            <!-- COLUNA 1 -->
             <div class="col-lg-4">
                 <form id="formClinico" action="/avaliar" method="post">
                 <div class="card-custom h-100">
-                    <h6 class="card-title-custom"><span class="number-badge">1</span> PACIENTE E COMORBILIDADES</h6>
+                    <h6 class="card-title-custom"><span class="number-badge">1</span> PACIENTE & COMORBILIDADES</h6>
                     <div class="row g-2 mb-3">
-                        <div class="col-6"><label class="form-label-custom">Idade</label><input type="number" name="idade" class="form-control form-control-sm"></div>
+                        <div class="col-6"><label class="form-label-custom">Idade (Anos)</label><input type="number" name="idade" class="form-control form-control-sm"></div>
                         <div class="col-6"><label class="form-label-custom">Setor</label><select class="form-select form-select-sm"><option>Enfermaria</option></select></div>
                     </div>
                     <div class="row g-2 mb-3">
-                        <div class="col-6"><label class="form-label-custom">Suporte/Dieta</label><select name="sonda_enteral" class="form-select form-select-sm"><option value="nao">Dieta Livre</option><option value="sim">Sonda Enteral</option></select></div>
+                        <div class="col-6"><label class="form-label-custom">Dieta / Sonda</label><select name="sonda_enteral" class="form-select form-select-sm"><option value="nao">Dieta Livre</option><option value="sim">Sonda Enteral</option></select></div>
                         <div class="col-6"><label class="form-label-custom">Diálise</label><select name="metodo_dialise" class="form-select form-select-sm"><option value="">Conservador</option><option value="HDI">Hemodiálise</option></select></div>
                     </div>
                     <label class="form-label-custom">Comorbilidades Clássicas</label>
                     <select name="comorbidades" id="comorb_select" multiple class="mb-3">
-                        <option value="icc">Insuficiência Cardíaca (ICC)</option>
+                        <option value="icc">Insuficiência Cardíaca</option>
                         <option value="asma">Asma / DPOC</option>
                         <option value="epilepsia">Epilepsia / Convulsão</option>
                         <option value="hepatopatia">Disfunção Hepática</option>
                     </select>
-                    <label class="form-label-custom text-danger">Alergia a Penicilinas?</label>
-                    <select name="alergia_beta" class="form-select form-select-sm border-danger"><option value="nao">Não / Desconhecida</option><option value="sim">Sim (Grave)</option></select>
+                    <label class="form-label-custom text-danger">ALERGIA?</label>
+                    <select name="alergia_beta" class="form-select form-select-sm border-danger"><option value="nao">Não / Desconhecida</option><option value="sim">Sim (Penicilinas)</option></select>
                 </div>
             </div>
 
-            <!-- COLUNA 2: RENAL & PROFILAXIAS -->
+            <!-- COLUNA 2 -->
             <div class="col-lg-4">
                 <div class="card-custom h-100">
                     <h6 class="card-title-custom"><span class="number-badge">2</span> FUNÇÃO RENAL & PROFILAXIAS</h6>
@@ -241,7 +248,7 @@ def gerar_html_dashboard(usuario, perfil, antibioticos=None, preenchimento_pdf="
                         <div class="col-6"><label class="form-label-custom">Creat. (mg/dL)</label><input type="number" step="0.01" name="creatinina" class="form-control form-control-sm"></div>
                         <div class="col-6"><label class="form-label-custom">Peso (kg)</label><input type="number" step="0.1" name="peso" class="form-control form-control-sm"></div>
                     </div>
-                    <div class="bg-light p-3 rounded border text-center mb-3">
+                    <div class="bg-light p-2 rounded border text-center mb-3">
                         <small class="text-muted fw-bold d-block mb-1">DEPURAÇÃO ESTIMADA</small>
                         <h4 class="text-teal mb-0 fw-bold">{clcr_display} <small style="font-size:0.9rem">mL/min</small></h4>
                     </div>
@@ -249,40 +256,41 @@ def gerar_html_dashboard(usuario, perfil, antibioticos=None, preenchimento_pdf="
                     <div class="row g-2">
                         <div class="col-6"><label class="form-label-custom">Heparina?</label><select name="tev_prescrito" class="form-select form-select-sm"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
                         <div class="col-6"><label class="form-label-custom">Escore Pádua</label><select name="pontos_padua" class="form-select form-select-sm"><option value="baixo">Baixo Risco</option><option value="alto">Alto Risco</option></select></div>
-                        <div class="col-6"><label class="form-label-custom">Omeprazol/IBP?</label><select name="ibp_prescrito" class="form-select form-select-sm"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
-                        <div class="col-6"><label class="form-label-custom">Uso de AINEs?</label><select name="uso_aine_corticoide" class="form-select form-select-sm"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
-                        <div class="col-12"><label class="form-label-custom text-danger">Plaquetopenia / Sangramento?</label><select name="plaquetas_baixas" class="form-select form-select-sm border-danger"><option value="nao">Não</option><option value="sim">Sim (Risco)</option></select></div>
+                        <div class="col-6"><label class="form-label-custom">Omeprazol?</label><select name="ibp_prescrito" class="form-select form-select-sm"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+                        <div class="col-6"><label class="form-label-custom">Uso AINEs?</label><select name="uso_aine_corticoide" class="form-select form-select-sm"><option value="nao">Não</option><option value="sim">Sim</option></select></div>
+                        <div class="col-12"><label class="form-label-custom text-danger">Plaquetopenia / Sangramento?</label><select name="plaquetas_baixas" class="form-select form-select-sm border-danger"><option value="nao">Não</option><option value="sim">Sim (Contraindicado)</option></select></div>
                     </div>
                 </div>
             </div>
 
-            <!-- COLUNA 3: LEITOR PDF -->
+            <!-- COLUNA 3 -->
             <div class="col-lg-4">
-                </form> <!-- Fecha o form principal temporariamente -->
+                </form>
                 <div class="card-custom h-100">
                     <h6 class="card-title-custom"><span class="number-badge">3</span> ENTRADA DA PRESCRIÇÃO</h6>
-                    <label class="form-label-custom">PRESCRIÇÃO EM PDF (MV / TASY)</label>
-                    <form action="/upload_pdf" method="post" enctype="multipart/form-data" class="mb-3 p-3 bg-light rounded border">
-                        <input type="file" name="arquivo_pdf" accept=".pdf" class="form-control form-control-sm mb-2" required>
-                        <button type="submit" class="btn btn-dark w-100 btn-sm fw-bold">EXTRAIR PRESCRIÇÃO</button>
+                    <label class="form-label-custom">PRESCRIÇÃO EM PDF (MV/TASY)</label>
+                    <form action="/upload_pdf" method="post" enctype="multipart/form-data">
+                        <div class="mb-3 p-3 bg-light rounded border text-center">
+                            <input type="file" name="arquivo_pdf" accept=".pdf" class="form-control form-control-sm mb-2" required>
+                            <button type="submit" class="btn btn-dark w-100 btn-sm fw-bold">EXTRAIR PRESCRIÇÃO</button>
+                        </div>
                     </form>
-                    <label class="form-label-custom text-muted">OU SELECIONE OS MEDICAMENTOS</label>
-                    <p class="small text-muted mb-1">A extração em PDF preencherá a lista abaixo automaticamente.</p>
+                    <p class="small text-muted mb-1 text-center">A extração em PDF preencherá a lista abaixo dividindo antibióticos e medicamentos gerais.</p>
                 </div>
             </div>
         </div>
         
-        <!-- LINHA 4: ANTIMICROBIANOS E AVALIAÇÃO -->
+        <!-- LINHA 4 -->
         <div class="card-custom">
-            <h6 class="card-title-custom"><span class="number-badge">4</span> MEDICAMENTOS EM USO E AVALIAÇÃO</h6>
+            <h6 class="card-title-custom"><span class="number-badge">4</span> MEDICAMENTOS EM USO</h6>
             <div class="row">
                 <div class="col-md-5 border-end pe-4">
-                    <form form="formClinico"> <!-- Reconecta os campos soltos ao form principal -->
-                    <label class="form-label-custom">LISTA GERAL DE FÁRMACOS</label>
-                    <select id="todos_medicamentos_select" name="todos_medicamentos_lista" multiple class="mb-4">{tags_iniciais}</select>
-                    
+                    <form form="formClinico">
                     <label class="form-label-custom">SLOTS DE ANTIMICROBIANOS</label>
                     {slots_atb}
+                    
+                    <label class="form-label-custom mt-3">LISTA GERAL DE FÁRMACOS</label>
+                    <select id="todos_medicamentos_select" name="todos_medicamentos_lista" multiple class="mb-4">{tags_iniciais}</select>
                     
                     <button type="submit" class="btn btn-radar w-100 mt-3 fw-bold fs-6 py-2" onclick="document.getElementById('formClinico').submit();">AVALIAR PRESCRIÇÃO</button>
                     </form>
@@ -294,7 +302,8 @@ def gerar_html_dashboard(usuario, perfil, antibioticos=None, preenchimento_pdf="
         </div>
         """
 
-    admin_btn = f'<a class="btn btn-sm btn-outline-light me-2 fw-bold" href="/admin">ADMIN (ACESSOS)</a>' if perfil == 'admin' else ''
+    # Geração dos botões da Navbar com cores idênticas ao print
+    admin_btn = f'<a class="btn btn-sm text-white fw-bold me-2" style="background-color: #0E7490; border: 1px solid #164E63;" href="/admin">ADMIN (ADMIN)</a>' if perfil == 'admin' else ''
     
     return f"""
     <!DOCTYPE html>
@@ -305,11 +314,11 @@ def gerar_html_dashboard(usuario, perfil, antibioticos=None, preenchimento_pdf="
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
         <style>
-            :root {{ --brand-teal: #0E7490; --brand-cyan: #06B6D4; --bg-color: #F0F4F8; }}
+            :root {{ --brand-teal: #0E7490; --brand-cyan: #06B6D4; --bg-color: #F8FAFC; }}
             body {{ background-color: var(--bg-color); font-family: -apple-system, sans-serif; padding-bottom: 2rem; }}
-            .navbar-custom {{ background-color: var(--brand-teal); box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 0.5rem 1.5rem; }}
-            .logo-header {{ background: #fff; border-radius: 8px; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; overflow: hidden; }}
-            .logo-header img {{ max-width: 100%; max-height: 100%; }}
+            .navbar-custom {{ background-color: var(--brand-teal); padding: 0.5rem 1.5rem; }}
+            .logo-header {{ background: #fff; border-radius: 8px; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 4px; }}
+            .logo-header img {{ max-width: 100%; max-height: 100%; object-fit: contain; }}
             .card-custom {{ background: #fff; border-radius: 10px; border: 1px solid #E2E8F0; padding: 1.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .card-title-custom {{ color: var(--brand-teal); font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; margin-bottom: 1.2rem; }}
             .number-badge {{ background-color: #E0F2FE; color: var(--brand-teal); border-radius: 6px; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; margin-right: 8px; font-weight: bold; font-size: 0.85rem; }}
@@ -317,29 +326,37 @@ def gerar_html_dashboard(usuario, perfil, antibioticos=None, preenchimento_pdf="
             .btn-radar {{ background-color: var(--brand-teal); color: white; border: none; }}
             .btn-radar:hover {{ background-color: var(--brand-cyan); color: white; }}
             .text-teal {{ color: var(--brand-teal) !important; }}
+            .nav-btn {{ font-size: 0.8rem; font-weight: bold; color: white; background-color: #0E7490; border: 1px solid #164E63; padding: 0.4rem 0.8rem; border-radius: 6px; text-decoration: none; margin-right: 0.5rem; }}
+            .nav-btn:hover {{ background-color: #164E63; color: white; }}
         </style>
     </head>
     <body>
+        <!-- NAVBAR IDÊNTICA AO PRINT -->
         <nav class="navbar navbar-expand-lg navbar-custom">
-            <div class="container-fluid">
-                <div class="d-flex align-items-center">
-                    <div class="logo-header me-3"><img src="/static/logo.jpg" onerror="this.style.display='none'"></div>
-                    <a class="btn btn-sm text-teal fw-bold" style="background-color: #06B6D4; color: white;" href="/dashboard">NOVA TRIAGEM</a>
+            <div class="container-fluid d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="logo-header">
+                        <img src="/static/logo.jpg" onerror="this.onerror=null; this.src='{LOGO_BASE64}';">
+                    </div>
+                    <a class="btn btn-sm fw-bold" style="background-color: #06B6D4; color: white; border: none; padding: 0.4rem 1rem;" href="/dashboard">↻ NOVA TRIAGEM</a>
                 </div>
+                
                 <div class="d-flex align-items-center text-white">
-                    <div class="me-4 text-end d-none d-md-block">
-                        <small class="d-block" style="font-size: 0.65rem; color: #bae6fd; font-weight: bold;">CLCR CALCULADO</small>
-                        <strong style="font-size: 1.1rem;">{clcr_display} <small>mL/min</small></strong>
+                    <div class="me-4 text-end d-none d-md-block" style="line-height: 1.1;">
+                        <small style="font-size: 0.65rem; color: #bae6fd; font-weight: bold;">CLCR CALCULADO</small><br>
+                        <strong style="font-size: 1rem;">{clcr_display} <small style="font-weight: normal; font-size: 0.8rem;">mL/min</small></strong>
                     </div>
-                    <div class="me-4 text-end d-none d-md-block">
-                        <small class="d-block" style="font-size: 0.65rem; color: #bae6fd; font-weight: bold;">ALERTAS CLÍNICOS</small>
-                        <strong style="font-size: 1.1rem; color: #fef08a;">{status_display}</strong>
+                    <div class="me-4 text-end d-none d-md-block" style="line-height: 1.1;">
+                        <small style="font-size: 0.65rem; color: #bae6fd; font-weight: bold;">ALERTAS CLÍNICOS</small><br>
+                        <strong style="font-size: 1rem; color: #fef08a;">{status_display}</strong>
                     </div>
-                    {admin_btn}
-                    <div class="me-3 px-3 py-1 rounded d-none d-md-block" style="background: rgba(0,0,0,0.2);">
-                        <small class="fw-bold"><i class="bi bi-person"></i> {usuario.upper()}</small>
+                    
+                    <div class="d-flex align-items-center border-start border-secondary ps-3 ms-2">
+                        {admin_btn}
+                        <a class="nav-btn" href="#">Métricas</a>
+                        <a class="nav-btn" href="#">Equipe</a>
+                        <a href="/logout" class="btn btn-sm fw-bold ms-2" style="background-color: #DC2626; color: white; padding: 0.4rem 1rem;">Sair</a>
                     </div>
-                    <a href="/logout" class="btn btn-danger btn-sm fw-bold">Sair</a>
                 </div>
             </div>
         </nav>
@@ -376,7 +393,7 @@ def gerar_html_dashboard(usuario, perfil, antibioticos=None, preenchimento_pdf="
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     user_data = obter_usuario_logado(request)
-    if not user_data: return RedirectResponse("/", 302)
+    if not user_data: return RedirectResponse("/logout", 302)
     with sqlite3.connect(DB_FILE) as conn:
         atbs = conn.cursor().execute("SELECT id, nome, classe FROM antibioticos ORDER BY nome ASC").fetchall()
     return gerar_html_dashboard(usuario=user_data[0], perfil=user_data[1], antibioticos=atbs)
