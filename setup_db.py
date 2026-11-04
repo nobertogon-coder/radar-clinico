@@ -1,10 +1,16 @@
 import sqlite3
+import os
 
 def setup_database():
+    # Remove a base de dados antiga, se existir, para evitar conflitos de esquema
+    if os.path.exists("radar_clinico.db"):
+        os.remove("radar_clinico.db")
+        print("Base de dados antiga removida. Criando uma nova...")
+
     conn = sqlite3.connect("radar_clinico.db")
     cursor = conn.cursor()
     
-    # 1. Tabela de Antimicrobianos com Suporte a Nomes Comerciais
+    # 1. Tabela de Antimicrobianos
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS antimicrobianos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,7 +26,7 @@ def setup_database():
         )
     """)
     
-    # 2. Lista Expandida (Genérico, Comercial, Dose Padrão, ClCr 30-50, ClCr 10-30, ClCr <10, HD, Monitorização, Farmacotécnica)
+    # Lista Expandida de Antimicrobianos
     atbs = [
         ("Meropenem", "Meronem", "1g a cada 8h", "1g a cada 12h", "500mg a cada 12h", "500mg a cada 24h", "500mg pós-HD", "Função renal, risco convulsivo", "Diluir em 100mL SF. Infusão estendida (3h)."),
         ("Imipenem + Cilastatina", "Tienam", "500mg a cada 6h", "250mg a cada 6h", "250mg a cada 12h", "125-250mg a cada 12h", "Dose pós-HD", "Risco convulsivo alto em disfunção renal", "Diluir em 100mL SF. Não usar via IM."),
@@ -58,7 +64,7 @@ def setup_database():
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, atbs)
 
-    # 3. Tabela de Interações
+    # 2. Tabela de Interações
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS interacoes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,8 +89,7 @@ def setup_database():
 
     conn.commit()
     conn.close()
-    print("Base de dados atualizada com sucesso.")
+    print("Base de dados criada/atualizada com sucesso!")
 
 if __name__ == "__main__":
     setup_database()
-    
