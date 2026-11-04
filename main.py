@@ -1,8 +1,10 @@
 import sqlite3
 import re
+import os
 from typing import List, Optional
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import pypdf
 import threading
@@ -11,8 +13,12 @@ import uvicorn
 
 app = FastAPI(title="Radar Clínico", description="Sistema de Apoio à Decisão Farmacêutica")
 
+# Montar a pasta static para carregar a logo original (logo.jpg)
+if os.path.isdir("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # ==============================================================================
-# 1. MOTOR CLÍNICO
+# LÓGICA CLÍNICA
 # ==============================================================================
 def calcular_metricas(sexo: str, idade: int, peso_atual: float, altura_cm: float, creatinina: float):
     alt_m = altura_cm / 100.0
@@ -51,7 +57,7 @@ def anonimizar(texto: str) -> str:
     return texto
 
 # ==============================================================================
-# 2. INTERFACE VISUAL (CARMIM / ARDÓSIA + ABAS + MARCA D'ÁGUA)
+# INTERFACE HTML (LOGIN + DASHBOARD UNIFICADO AZUL)
 # ==============================================================================
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -59,139 +65,245 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radar Clínico - Farmácia Hospitalar</title>
+    <title>Radar Clínico - Triagem Farmacêutica</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --brand-primary: #722F37;
-            --brand-dark: #3b171c;
-            --brand-slate: #2c3e50;
-            --brand-teal: #16697a;
-            --bg-canvas: #f8fafc;
+            /* Paleta Azul do Radar Clínico */
+            --brand-primary: #0056b3; 
+            --brand-light: #e0f2fe;
+            --brand-dark: #003d82;
+            --bg-login: #3b4252; /* Fundo ardósia escuro idêntico ao Radar Beers */
+            --bg-dashboard: #f3f4f6;
         }
-        body { background-color: var(--bg-canvas); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #334155; }
-        .header-radar { background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-dark) 100%); color: #ffffff; padding: 16px 24px; border-radius: 12px; margin-bottom: 24px; }
-        .card-custom { border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); background: #ffffff; margin-bottom: 20px; }
-        .nav-tabs .nav-link { color: #64748b; font-weight: 600; padding: 12px 20px; border-bottom: 3px solid transparent; }
-        .nav-tabs .nav-link.active { color: var(--brand-primary); border-bottom: 3px solid var(--brand-primary); background: transparent; }
-        .metric-badge { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
-        .metric-value { font-size: 1.4rem; font-weight: 700; color: var(--brand-primary); }
-        .slot-atb { background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
-        .soap-container { position: relative; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; }
-        .watermark-bg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 4.5rem; font-weight: 900; color: rgba(114, 47, 55, 0.04); letter-spacing: 4px; pointer-events: none; user-select: none; }
-        .soap-output { position: relative; z-index: 1; background: transparent; font-family: monospace; font-size: 0.90rem; line-height: 1.5; color: #1e293b; border: none; width: 100%; resize: vertical; padding: 16px; outline: none; }
-        .btn-carmim { background-color: var(--brand-primary); color: #ffffff; border: none; }
-        .btn-carmim:hover { background-color: var(--brand-dark); color: #ffffff; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-dashboard); color: #374151; }
+        
+        /* TELA DE LOGIN */
+        #login-view { background-color: var(--bg-login); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .login-card { background: #fff; width: 100%; max-width: 400px; border-radius: 12px; padding: 2.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .login-logo-box { background: #f8fafc; border-radius: 12px; padding: 15px; display: inline-block; margin-bottom: 15px; }
+        .login-logo { height: 80px; object-fit: contain; }
+        .badge-acesso { background-color: var(--brand-light); color: var(--brand-primary); font-weight: 700; letter-spacing: 0.5px; font-size: 0.75rem; padding: 6px 12px; border-radius: 20px; }
+        .form-label-custom { font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-control-custom { border-radius: 8px; border: 1px solid #d1d5db; padding: 10px 15px; }
+        .form-control-custom:focus { border-color: var(--brand-primary); box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.15); }
+        .btn-login { background-color: var(--brand-primary); color: white; border: none; border-radius: 8px; font-weight: 600; padding: 12px; margin-top: 10px; }
+        .btn-login:hover { background-color: var(--brand-dark); color: white; }
+
+        /* DASHBOARD (Estilo Radar Beers) */
+        .navbar-radar { background-color: var(--brand-primary); padding: 10px 20px; }
+        .nav-logo { height: 35px; background: white; padding: 4px; border-radius: 6px; }
+        .card-dash { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; background: white; border-top: 4px solid var(--brand-primary); }
+        .card-title-dash { font-size: 0.9rem; font-weight: 700; color: var(--brand-primary); text-transform: uppercase; margin-bottom: 1.2rem; display: flex; align-items: center; }
+        .step-number { background: var(--brand-light); color: var(--brand-primary); width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; margin-right: 10px; }
+        
+        .metric-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
+        .metric-value { font-size: 1.8rem; font-weight: 800; color: var(--brand-primary); margin: 5px 0; }
+        
+        .soap-output { font-family: 'Consolas', monospace; font-size: 0.9rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; padding: 15px; width: 100%; min-height: 300px; resize: vertical; }
+        
+        /* Utilitários */
+        .d-none { display: none !important; }
     </style>
 </head>
-<body class="p-3 p-md-4">
-<div class="container-fluid max-width-1300">
+<body>
 
-    <div class="header-radar d-flex justify-content-between align-items-center">
-        <div>
-            <h3 class="fw-bold mb-1"><i class="bi bi-shield-plus me-2"></i>Radar Clínico</h3>
-            <p class="mb-0 text-white-50 small">Sistema Farmacêutico Hospitalar de Suporte à Decisão Clínica</p>
+<!-- TELA DE LOGIN -->
+<div id="login-view">
+    <div class="login-card text-center">
+        <div class="login-logo-box">
+            <img src="/static/logo.jpg" alt="Logo Radar Clínico" class="login-logo" onerror="this.src='https://via.placeholder.com/80?text=LOGO'">
         </div>
-        <div>
-            <span class="badge bg-white text-dark me-2 py-2 px-3"><i class="bi bi-check-circle-fill text-success"></i> LGPD</span>
+        <div class="mb-4">
+            <span class="badge-acesso">ACESSO FARMACÊUTICO</span>
         </div>
+        
+        <form id="loginForm" onsubmit="event.preventDefault(); fazerLogin();" class="text-start">
+            <div class="mb-3">
+                <label class="form-label-custom">Usuário</label>
+                <input type="text" class="form-control form-control-custom" id="user" placeholder="admin" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label-custom">Senha</label>
+                <input type="password" class="form-control form-control-custom" id="pass" placeholder="••••••••" required>
+            </div>
+            <div id="loginError" class="text-danger small mb-3 fw-bold d-none">Usuário ou senha inválidos.</div>
+            
+            <button type="submit" class="btn-login w-100">Entrar no Sistema</button>
+        </form>
     </div>
+</div>
 
-    <div class="row g-2 mb-3">
-        <div class="col-md-3 col-6"><div class="metric-badge"><div class="small fw-bold">ClCr Estimado</div><div class="metric-value" id="valClcr">--</div><span class="small">mL/min</span></div></div>
-        <div class="col-md-3 col-6"><div class="metric-badge"><div class="small fw-bold">IMC</div><div class="metric-value text-dark" id="valImc">--</div><span class="small">kg/m²</span></div></div>
-        <div class="col-md-3 col-6"><div class="metric-badge"><div class="small fw-bold">Peso Ideal</div><div class="metric-value text-dark" id="valPesoIdeal">--</div><span class="small">kg</span></div></div>
-        <div class="col-md-3 col-6"><div class="metric-badge"><div class="small fw-bold">Peso Adotado</div><div class="metric-value" style="color: var(--brand-teal);" id="valPesoAdotado">--</div><span class="small">kg</span></div></div>
-    </div>
+<!-- DASHBOARD DO SISTEMA -->
+<div id="app-view" class="d-none">
+    <!-- Navbar -->
+    <nav class="navbar navbar-radar d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-3">
+            <img src="/static/logo.jpg" class="nav-logo" alt="Logo" onerror="this.style.display='none'">
+            <span class="text-white fw-bold">RADAR CLÍNICO</span>
+            <button class="btn btn-sm btn-light fw-bold text-primary px-3 rounded-pill ms-3"><i class="bi bi-shield-check"></i> LGPD Ativo</button>
+        </div>
+        <div class="d-flex align-items-center gap-4">
+            <div class="text-end">
+                <div class="text-white-50" style="font-size: 0.7rem; font-weight: 700; letter-spacing: 1px;">CLCR CALCULADO</div>
+                <div class="text-white fw-bold" id="navClcr">-- mL/min</div>
+            </div>
+            <button class="btn btn-outline-light btn-sm fw-bold px-3" onclick="fazerLogout()"><i class="bi bi-box-arrow-right"></i> Sair</button>
+        </div>
+    </nav>
 
-    <div class="row">
-        <div class="col-lg-5">
-            <div class="card card-custom">
-                <div class="card-header bg-white pb-0">
-                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
-                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#content-paciente">1. Paciente</button></li>
-                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#content-atb">2. Terapêutica</button></li>
-                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#content-profilaxias">3. Profilaxias</button></li>
-                    </ul>
-                </div>
-                
-                <div class="card-body tab-content pt-3">
-                    <div class="tab-pane fade show active" id="content-paciente">
-                        <h6 class="fw-bold small text-uppercase">Importação (PDF)</h6>
-                        <div class="input-group input-group-sm mb-2">
-                            <input type="file" class="form-control" id="pdfFile" accept=".pdf">
-                            <button class="btn btn-outline-secondary" onclick="extrairPdf()">Anonimizar</button>
+    <div class="container-fluid p-4 max-width-1300">
+        <div class="row g-4">
+            
+            <!-- Bloco 1: Paciente -->
+            <div class="col-lg-4">
+                <div class="card card-dash p-3 h-100">
+                    <div class="card-title-dash"><span class="step-number">1</span> Paciente & Perfil</div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label-custom">Idade (Anos)</label>
+                            <input type="number" id="idade" class="form-control form-control-custom" value="65">
                         </div>
-                        <textarea id="textoPrescricao" class="form-control form-control-sm mb-3" rows="3"></textarea>
-
-                        <h6 class="fw-bold small text-uppercase">Parâmetros</h6>
-                        <div class="row g-2">
-                            <div class="col-6"><label class="small">Sexo</label><select id="sexo" class="form-select form-select-sm"><option value="m">Masculino</option><option value="f">Feminino</option></select></div>
-                            <div class="col-6"><label class="small">Idade</label><input type="number" id="idade" class="form-control form-control-sm" value="65"></div>
-                            <div class="col-4"><label class="small">Peso (kg)</label><input type="number" id="peso" class="form-control form-control-sm" value="70"></div>
-                            <div class="col-4"><label class="small">Altura (cm)</label><input type="number" id="altura" class="form-control form-control-sm" value="170"></div>
-                            <div class="col-4"><label class="small">Cr (mg/dL)</label><input type="number" step="0.1" id="creatinina" class="form-control form-control-sm" value="1.2"></div>
+                        <div class="col-6">
+                            <label class="form-label-custom">Sexo Biológico</label>
+                            <select id="sexo" class="form-select form-control-custom">
+                                <option value="m">Masculino</option>
+                                <option value="f">Feminino</option>
+                            </select>
                         </div>
-                        <button class="btn btn-carmim w-100 btn-sm mt-3" onclick="gerarAnalise()">Calcular & Avaliar</button>
-                    </div>
-
-                    <div class="tab-pane fade" id="content-atb">
-                        <div class="slot-atb"><label class="small fw-bold">Slot 1</label><select id="slot1" class="form-select form-select-sm"><option value="">-- Nenhum --</option></select></div>
-                        <div class="slot-atb"><label class="small fw-bold">Slot 2</label><select id="slot2" class="form-select form-select-sm"><option value="">-- Nenhum --</option></select></div>
-                        <div class="slot-atb"><label class="small fw-bold">Slot 3</label><select id="slot3" class="form-select form-select-sm"><option value="">-- Nenhum --</option></select></div>
-                        <div class="slot-atb"><label class="small fw-bold">Slot 4</label><select id="slot4" class="form-select form-select-sm"><option value="">-- Nenhum --</option></select></div>
-                        <button class="btn btn-carmim w-100 btn-sm mt-2" onclick="gerarAnalise()">Atualizar Parecer</button>
-                    </div>
-
-                    <div class="tab-pane fade" id="content-profilaxias">
-                        <div class="form-check p-2 border rounded mb-2 bg-light">
-                            <input class="form-check-input ms-0 me-2" type="checkbox" id="profilaxiaTev" checked>
-                            <label class="form-check-label small fw-bold" for="profilaxiaTev">Profilaxia de TEV</label>
+                        <div class="col-12 mt-3">
+                            <label class="form-label-custom">Profilaxias Institucionais Ativas</label>
+                            <div class="d-flex gap-3 mt-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="profilaxiaTev" checked>
+                                    <label class="form-check-label small fw-bold">TEV</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="profilaxiaLamg" checked>
+                                    <label class="form-check-label small fw-bold">LAMG</label>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-check p-2 border rounded mb-3 bg-light">
-                            <input class="form-check-input ms-0 me-2" type="checkbox" id="profilaxiaLamg" checked>
-                            <label class="form-check-label small fw-bold" for="profilaxiaLamg">Profilaxia LAMG</label>
-                        </div>
-                        <label class="small fw-bold">Outros (Rastreio Interações)</label>
-                        <input type="text" id="outrosMedicamentos" class="form-control form-control-sm" placeholder="Ex: amiodarona, furosemida...">
-                        <button class="btn btn-carmim w-100 btn-sm mt-3" onclick="gerarAnalise()">Consolidar Parecer</button>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="col-lg-7">
-            <div class="card card-custom p-3 h-100 d-flex flex-column">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h5 class="fw-bold mb-0">Evolução (SOAP)</h5>
-                    <button class="btn btn-outline-dark btn-sm" onclick="copiarSoap()">Copiar</button>
-                </div>
-                <div class="soap-container flex-grow-1 position-relative">
-                    <div class="watermark-bg">RADAR CLÍNICO</div>
-                    <textarea id="parecerSoap" class="soap-output" rows="22" readonly></textarea>
+            <!-- Bloco 2: Antropometria & Renal -->
+            <div class="col-lg-4">
+                <div class="card card-dash p-3 h-100">
+                    <div class="card-title-dash"><span class="step-number">2</span> Função Renal & Antropometria</div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-4">
+                            <label class="form-label-custom">Creat. (mg/dL)</label>
+                            <input type="number" step="0.1" id="creatinina" class="form-control form-control-custom" value="1.2">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label-custom">Peso (kg)</label>
+                            <input type="number" id="peso" class="form-control form-control-custom" value="70">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label-custom">Altura (cm)</label>
+                            <input type="number" id="altura" class="form-control form-control-custom" value="170">
+                        </div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="form-label-custom text-muted">DEPURAÇÃO ESTIMADA (COCKCROFT-GAULT)</div>
+                        <div class="metric-value" id="valClcr">-- <span style="font-size:1rem;">mL/min</span></div>
+                        <div class="small fw-bold text-secondary mt-1">Peso p/ Ajuste: <span id="valPesoAdotado">--</span> kg</div>
+                    </div>
                 </div>
             </div>
+
+            <!-- Bloco 3: Extração de Prescrição -->
+            <div class="col-lg-4">
+                <div class="card card-dash p-3 h-100">
+                    <div class="card-title-dash"><span class="step-number">3</span> Entrada da Prescrição</div>
+                    <label class="form-label-custom">Importar PDF (Anonimizado)</label>
+                    <div class="input-group input-group-sm mb-2">
+                        <input type="file" class="form-control" id="pdfFile" accept=".pdf">
+                        <button class="btn btn-outline-secondary fw-bold" type="button" onclick="extrairPdf()">Extrair</button>
+                    </div>
+                    <label class="form-label-custom mt-2">Ou cole a prescrição (Rastreio N x N)</label>
+                    <textarea id="outrosMedicamentos" class="form-control form-control-custom mt-1" rows="3" placeholder="Digite medicamentos separados por vírgula..."></textarea>
+                </div>
+            </div>
+            
+            <!-- Bloco 4: Terapêutica Antimicrobiana -->
+            <div class="col-12">
+                <div class="card card-dash p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="card-title-dash mb-0"><span class="step-number">4</span> Terapêutica Antimicrobiana & Avaliação SOAP</div>
+                        <button class="btn btn-primary fw-bold px-4" style="background-color: var(--brand-primary); border:none; border-radius: 8px;" onclick="gerarAnalise()">
+                            <i class="bi bi-play-fill"></i> GERAR AVALIAÇÃO CLÍNICA
+                        </button>
+                    </div>
+                    
+                    <div class="row g-4">
+                        <div class="col-lg-5">
+                            <div class="bg-light p-3 rounded border">
+                                <label class="form-label-custom mb-2">Seleção de Fármacos em Uso</label>
+                                <select id="slot1" class="form-select form-control-custom mb-2"><option value="">-- Antimicrobiano 1 --</option></select>
+                                <select id="slot2" class="form-select form-control-custom mb-2"><option value="">-- Antimicrobiano 2 --</option></select>
+                                <select id="slot3" class="form-select form-control-custom mb-2"><option value="">-- Antimicrobiano 3 --</option></select>
+                                <select id="slot4" class="form-select form-control-custom mb-2"><option value="">-- Antimicrobiano 4 --</option></select>
+                            </div>
+                        </div>
+                        <div class="col-lg-7">
+                            <div class="position-relative">
+                                <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-2 fw-bold" onclick="copiarSoap()">Copiar Parecer</button>
+                                <textarea id="parecerSoap" class="soap-output" readonly placeholder="Preencha os dados e clique em 'Gerar Avaliação Clínica' para processar o parecer estruturado..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-document.addEventListener("DOMContentLoaded", async () => {
-    const res = await fetch("/api/antimicrobianos");
-    const catalogo = await res.json();
-    const selects = [document.getElementById("slot1"), document.getElementById("slot2"), document.getElementById("slot3"), document.getElementById("slot4")];
-    
-    selects.forEach(select => {
-        catalogo.forEach(item => {
-            const opt = document.createElement("option");
-            opt.value = item.nome; 
-            opt.innerText = item.nome;
-            select.appendChild(opt);
+// Mock Login Simples
+function fazerLogin() {
+    const user = document.getElementById('user').value;
+    const pass = document.getElementById('pass').value;
+    if(user === 'admin' && pass === 'admin') {
+        document.getElementById('login-view').classList.add('d-none');
+        document.getElementById('app-view').classList.remove('d-none');
+        carregarCatalogo();
+    } else {
+        document.getElementById('loginError').classList.remove('d-none');
+    }
+}
+
+function fazerLogout() {
+    document.getElementById('app-view').classList.add('d-none');
+    document.getElementById('login-view').classList.remove('d-none');
+    document.getElementById('user').value = '';
+    document.getElementById('pass').value = '';
+    document.getElementById('loginError').classList.add('d-none');
+}
+
+// Carregar BD
+async function carregarCatalogo() {
+    try {
+        const res = await fetch("/api/antimicrobianos");
+        const catalogo = await res.json();
+        const selects = [document.getElementById("slot1"), document.getElementById("slot2"), document.getElementById("slot3"), document.getElementById("slot4")];
+        
+        selects.forEach(select => {
+            if(select.options.length <= 1) { // Evita duplicar se recarregar
+                catalogo.forEach(item => {
+                    const opt = document.createElement("option");
+                    opt.value = item.nome; 
+                    opt.innerText = item.nome;
+                    select.appendChild(opt);
+                });
+            }
         });
-    });
-});
+    } catch(e) { console.log("Aguardando Banco de Dados..."); }
+}
 
 async function extrairPdf() {
     const fileInput = document.getElementById("pdfFile");
@@ -199,12 +311,12 @@ async function extrairPdf() {
     const formData = new FormData(); formData.append("file", fileInput.files[0]);
     const res = await fetch("/api/extrair-pdf", { method: "POST", body: formData });
     const data = await res.json();
-    document.getElementById("textoPrescricao").value = data.texto_anonimizado;
+    document.getElementById("outrosMedicamentos").value = data.texto_anonimizado;
 }
 
 async function gerarAnalise() {
     const atbs = [document.getElementById("slot1").value, document.getElementById("slot2").value, document.getElementById("slot3").value, document.getElementById("slot4").value].filter(i => i !== "");
-    const outros = document.getElementById("outrosMedicamentos").value.split(",").map(s => s.trim()).filter(s => s.length > 0);
+    const outros = document.getElementById("outrosMedicamentos").value.split(",").map(s => s.trim()).filter(s => s.length > 0 && s.length < 50); // Filtro básico p/ não enviar texto inteiro do PDF
 
     const payload = {
         sexo: document.getElementById("sexo").value,
@@ -222,8 +334,7 @@ async function gerarAnalise() {
     const data = await res.json();
 
     document.getElementById("valClcr").innerText = data.metricas.clcr;
-    document.getElementById("valImc").innerText = data.metricas.imc;
-    document.getElementById("valPesoIdeal").innerText = data.metricas.peso_ideal;
+    document.getElementById("navClcr").innerText = data.metricas.clcr + " mL/min";
     document.getElementById("valPesoAdotado").innerText = data.metricas.peso_adotado;
     document.getElementById("parecerSoap").value = data.soap;
 }
@@ -231,7 +342,7 @@ async function gerarAnalise() {
 function copiarSoap() {
     const txt = document.getElementById("parecerSoap");
     txt.select(); navigator.clipboard.writeText(txt.value);
-    alert("Copiado!");
+    alert("Parecer SOAP copiado para a área de transferência!");
 }
 </script>
 </body>
@@ -239,7 +350,7 @@ function copiarSoap() {
 """
 
 # ==============================================================================
-# 3. ROTAS E LÓGICA DA API
+# ROTAS DA API
 # ==============================================================================
 class AvaliacaoPayload(BaseModel):
     sexo: str
@@ -260,13 +371,12 @@ def index():
 def get_antimicrobianos():
     conn = sqlite3.connect("radar_clinico.db")
     cursor = conn.cursor()
-    # Verifica de forma segura se a tabela já possui a coluna nova
     try:
         cursor.execute("SELECT id, nome_generico, nomes_comerciais FROM antimicrobianos ORDER BY nome_generico ASC")
         rows = cursor.fetchall()
     except sqlite3.OperationalError:
         conn.close()
-        return [{"id": 0, "nome": "Erro: Base não atualizada. Rode setup_db.py primeiro.", "nome_generico": "Erro"}]
+        return [{"id": 0, "nome": "Base não atualizada. Rode setup_db.py", "nome_generico": "Erro"}]
     
     items = []
     for r in rows:
@@ -310,13 +420,14 @@ def avaliar_paciente(payload: AvaliacaoPayload):
             avaliacoes.append({"nome": nome_generico, "posologia": poso, "monitor": mon})
             farmacotecnias.append(f"• {nome_generico}: {farm}")
 
-    # Interações
+    # Interações (Verificação N x N)
     todos_farmacos_genericos.extend(payload.outros_medicamentos)
     interacoes_encontradas = []
     
     for i in range(len(todos_farmacos_genericos)):
         for j in range(i + 1, len(todos_farmacos_genericos)):
-            d1, d2 = todos_farmacos_genericos[i], todos_farmacos_genericos[j]
+            d1, d2 = todos_farmacos_genericos[i].strip(), todos_farmacos_genericos[j].strip()
+            if not d1 or not d2: continue
             cursor.execute("""
                 SELECT gravidade, mecanismo, conduta FROM interacoes 
                 WHERE (LOWER(droga_a) = LOWER(?) AND LOWER(droga_b) = LOWER(?)) 
@@ -328,7 +439,7 @@ def avaliar_paciente(payload: AvaliacaoPayload):
 
     conn.close()
 
-    # Formatação SOAP
+    # Montagem do SOAP
     soap = [
         "=== EVOLUÇÃO FARMACÊUTICA // RADAR CLÍNICO ===",
         "[S] SUBJETIVO: Acompanhamento da farmacoterapia do leito. Triagem de prescrição médica ativa.",
@@ -364,6 +475,5 @@ def avaliar_paciente(payload: AvaliacaoPayload):
     return {"metricas": metricas, "soap": "\n".join(soap)}
 
 if __name__ == "__main__":
-    # Função para abrir automaticamente no PC/Pendrive
     threading.Timer(1.5, lambda: webbrowser.open("http://127.0.0.1:8000")).start()
     uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="warning")
