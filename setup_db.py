@@ -9,18 +9,11 @@ def setup_database():
     conn = sqlite3.connect("radar_clinico.db")
     cursor = conn.cursor()
     
-    # 1. Tabela de Usuários (NOVO)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            role TEXT NOT NULL
-        )
-    """)
+    # 1. Usuários
+    cursor.execute("CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, role TEXT NOT NULL)")
     cursor.execute("INSERT OR IGNORE INTO usuarios (username, password, role) VALUES ('admin', 'admin', 'admin')")
 
-    # 2. Tabela de Antimicrobianos
+    # 2. Antimicrobianos
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS antimicrobianos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,8 +28,6 @@ def setup_database():
             farmacotecnia TEXT
         )
     """)
-    
-    # Lista Expandida de Antimicrobianos
     atbs = [
         ("Meropenem", "Meronem", "1g a cada 8h", "1g a cada 12h", "500mg a cada 12h", "500mg a cada 24h", "500mg pós-HD", "Função renal, risco convulsivo", "Diluir em 100mL SF. Infusão estendida (3h)."),
         ("Imipenem + Cilastatina", "Tienam", "500mg a cada 6h", "250mg a cada 6h", "250mg a cada 12h", "125-250mg a cada 12h", "Dose pós-HD", "Risco convulsivo alto em disfunção renal", "Diluir em 100mL SF. Não usar via IM."),
@@ -67,35 +58,35 @@ def setup_database():
         ("Micafungina", "Mycamine", "100mg a cada 24h", "Sem ajuste", "Sem ajuste", "Sem ajuste", "Sem ajuste", "Hepatotoxicidade", "Proteger bolsa EV da luz."),
         ("Fluconazol", "Zoltec", "400mg a cada 24h", "200mg a cada 24h", "200mg a cada 24h", "200mg a cada 24h", "Dose integral pós-HD", "Hepatotoxicidade, QTc", "Pode reduzir dose em 50% após o ataque se ClCr < 50.")
     ]
-    
-    cursor.executemany("""
-        INSERT OR IGNORE INTO antimicrobianos 
-        (nome_generico, nomes_comerciais, dose_padrao, ajuste_clcr_30_50, ajuste_clcr_10_30, ajuste_clcr_menor_10, ajuste_hemodialise, monitorizacao, farmacotecnia)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, atbs)
+    cursor.executemany("INSERT OR IGNORE INTO antimicrobianos (nome_generico, nomes_comerciais, dose_padrao, ajuste_clcr_30_50, ajuste_clcr_10_30, ajuste_clcr_menor_10, ajuste_hemodialise, monitorizacao, farmacotecnia) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", atbs)
 
-    # 3. Tabela de Interações
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS interacoes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            droga_a TEXT NOT NULL,
-            droga_b TEXT NOT NULL,
-            gravidade TEXT,
-            mecanismo TEXT,
-            conduta TEXT
-        )
-    """)
-    
+    # 3. Interações
+    cursor.execute("CREATE TABLE IF NOT EXISTS interacoes (id INTEGER PRIMARY KEY AUTOINCREMENT, droga_a TEXT NOT NULL, droga_b TEXT NOT NULL, gravidade TEXT, mecanismo TEXT, conduta TEXT)")
     interacoes = [
         ("Vancomicina", "Piperacilina + Tazobactam", "Grave", "Potencialização de nefrotoxicidade sinérgica", "Monitorar creatinina e débito urinário diariamente; considerar trocar beta-lactâmico."),
         ("Ciprofloxacino", "Amiodarona", "Maior", "Prolongamento sinérgico do intervalo QTc", "Monitorização eletrocardiográfica diária; avaliar alternativa antimicrobiana."),
         ("Omeprazol", "Clopidogrel", "Moderada", "Inibição competitiva da CYP2C19 com redução de eficácia antiagregante", "Substituir por Pantoprazol se indicado protetor gástrico.")
     ]
-    
-    cursor.executemany("""
-        INSERT OR IGNORE INTO interacoes (droga_a, droga_b, gravidade, mecanismo, conduta)
-        VALUES (?, ?, ?, ?, ?)
-    """, interacoes)
+    cursor.executemany("INSERT OR IGNORE INTO interacoes (droga_a, droga_b, gravidade, mecanismo, conduta) VALUES (?, ?, ?, ?, ?)", interacoes)
+
+    # 4. Regras Farmacotécnicas (NOVO - Cérebro de Incompatibilidades)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS regras_farmacotecnicas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            farmaco TEXT NOT NULL,
+            condicao TEXT NOT NULL,
+            alerta TEXT NOT NULL
+        )
+    """)
+    regras_farmaco = [
+        ("dipirona", "ad", "Água Destilada pode causar dor e flebite na infusão. Sugere-se SF 0,9% ou SG 5%."),
+        ("dipirona", "agua destilada", "Água Destilada pode causar dor e flebite na infusão. Sugere-se SF 0,9% ou SG 5%."),
+        ("fenitoina", "sg", "Incompatível com Soro Glicosado (risco de cristalização). Utilizar apenas SF 0,9%."),
+        ("ampicilina", "sg", "Baixa estabilidade em Soro Glicosado. Diluir exclusivamente em SF 0,9%."),
+        ("daptomicina", "sg", "Incompatível com Soro Glicosado. Diluir em SF 0,9% ou Ringer Lactato."),
+        ("omeprazol", "sg", "Menos estável em SG 5%. Recomenda-se reconstituição/diluição em SF 0,9%.")
+    ]
+    cursor.executemany("INSERT OR IGNORE INTO regras_farmacotecnicas (farmaco, condicao, alerta) VALUES (?, ?, ?)", regras_farmaco)
 
     conn.commit()
     conn.close()
