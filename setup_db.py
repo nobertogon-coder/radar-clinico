@@ -2,7 +2,6 @@ import sqlite3
 import os
 
 def setup_database():
-    # Remove a base de dados antiga, se existir, para evitar conflitos de esquema
     if os.path.exists("radar_clinico.db"):
         os.remove("radar_clinico.db")
         print("Base de dados antiga removida. Criando uma nova...")
@@ -10,7 +9,18 @@ def setup_database():
     conn = sqlite3.connect("radar_clinico.db")
     cursor = conn.cursor()
     
-    # 1. Tabela de Antimicrobianos
+    # 1. Tabela de Usuários (NOVO)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL
+        )
+    """)
+    cursor.execute("INSERT OR IGNORE INTO usuarios (username, password, role) VALUES ('admin', 'admin', 'admin')")
+
+    # 2. Tabela de Antimicrobianos
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS antimicrobianos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,7 +74,7 @@ def setup_database():
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, atbs)
 
-    # 2. Tabela de Interações
+    # 3. Tabela de Interações
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS interacoes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
