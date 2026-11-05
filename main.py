@@ -1,7 +1,7 @@
 import sqlite3
 import re
 import os
-from typing import List, Optional
+from typing import List
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -103,16 +103,9 @@ HTML_TEMPLATE = """
             <img src="/static/logo.jpg" alt="Logo" class="login-logo" onerror="this.src='https://via.placeholder.com/80?text=LOGO'">
         </div>
         <div class="mb-4"><span class="badge-acesso">ACESSO FARMACÊUTICO</span></div>
-        
         <form id="loginForm" onsubmit="event.preventDefault(); fazerLogin();" class="text-start">
-            <div class="mb-3">
-                <label class="form-label-custom">Usuário</label>
-                <input type="text" class="form-control form-control-custom" id="user" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label-custom">Senha</label>
-                <input type="password" class="form-control form-control-custom" id="pass" required>
-            </div>
+            <div class="mb-3"><label class="form-label-custom">Usuário</label><input type="text" class="form-control form-control-custom" id="user" required></div>
+            <div class="mb-3"><label class="form-label-custom">Senha</label><input type="password" class="form-control form-control-custom" id="pass" required></div>
             <div id="loginError" class="text-danger small mb-3 fw-bold d-none">Usuário ou senha inválidos.</div>
             <button type="submit" class="btn-brand w-100 py-3">Entrar no Sistema</button>
         </form>
@@ -143,19 +136,13 @@ HTML_TEMPLATE = """
                 <div class="card card-dash p-3 h-100">
                     <div class="card-title-dash"><span class="step-number">1</span> Paciente & Perfil</div>
                     <div class="row g-3">
-                        <div class="col-6">
-                            <label class="form-label-custom">Idade (Anos)</label>
-                            <input type="number" id="idade" class="form-control form-control-custom" value="65">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label-custom">Sexo Biológico</label>
-                            <select id="sexo" class="form-select form-control-custom"><option value="m">Masculino</option><option value="f">Feminino</option></select>
-                        </div>
+                        <div class="col-6"><label class="form-label-custom">Idade (Anos)</label><input type="number" id="idade" class="form-control form-control-custom" value="65"></div>
+                        <div class="col-6"><label class="form-label-custom">Sexo Biológico</label><select id="sexo" class="form-select form-control-custom"><option value="m">Masculino</option><option value="f">Feminino</option></select></div>
                         <div class="col-12 mt-3">
-                            <label class="form-label-custom">Profilaxias Ativas</label>
-                            <div class="d-flex gap-3 mt-2">
-                                <div class="form-check"><input class="form-check-input" type="checkbox" id="profilaxiaTev" checked><label class="form-check-label small fw-bold">TEV</label></div>
-                                <div class="form-check"><input class="form-check-input" type="checkbox" id="profilaxiaLamg" checked><label class="form-check-label small fw-bold">LAMG</label></div>
+                            <label class="form-label-custom">Fatores de Risco</label>
+                            <div class="form-check mt-1">
+                                <input class="form-check-input" type="checkbox" id="pacienteAcamado">
+                                <label class="form-check-label small fw-bold text-danger">Paciente Acamado / Restrito ao leito</label>
                             </div>
                         </div>
                     </div>
@@ -182,14 +169,14 @@ HTML_TEMPLATE = """
             <!-- Bloco 3 -->
             <div class="col-lg-4">
                 <div class="card card-dash p-3 h-100">
-                    <div class="card-title-dash"><span class="step-number">3</span> Entrada da Prescrição</div>
-                    <label class="form-label-custom">Importar PDF (Anonimizado)</label>
+                    <div class="card-title-dash"><span class="step-number">3</span> Extração Automática</div>
+                    <label class="form-label-custom">Importar PDF (Leitura Inteligente)</label>
                     <div class="input-group input-group-sm mb-2">
                         <input type="file" class="form-control" id="pdfFile" accept=".pdf">
-                        <button class="btn btn-outline-secondary fw-bold" type="button" onclick="extrairPdf()">Extrair</button>
+                        <button class="btn btn-outline-secondary fw-bold" type="button" onclick="extrairPdf()">Extrair & Distribuir</button>
                     </div>
-                    <label class="form-label-custom mt-2">Rastreio Rápido N x N</label>
-                    <textarea id="outrosMedicamentos" class="form-control form-control-custom mt-1" rows="3" placeholder="Ex: amiodarona, furosemida..."></textarea>
+                    <label class="form-label-custom mt-2">Texto da Prescrição / Outros Fármacos</label>
+                    <textarea id="textoPrescricao" class="form-control form-control-custom mt-1" rows="3" placeholder="O PDF será lido e as incompatibilidades (Diluentes, Vias, Interações) serão rastreadas neste campo..."></textarea>
                 </div>
             </div>
             
@@ -203,7 +190,7 @@ HTML_TEMPLATE = """
                     <div class="row g-4">
                         <div class="col-lg-5">
                             <div class="bg-light p-3 rounded border">
-                                <label class="form-label-custom mb-2">Seleção de Fármacos em Uso</label>
+                                <label class="form-label-custom mb-2">Antimicrobianos Detectados</label>
                                 <select id="slot1" class="form-select form-control-custom mb-2"><option value="">-- Slot 1 --</option></select>
                                 <select id="slot2" class="form-select form-control-custom mb-2"><option value="">-- Slot 2 --</option></select>
                                 <select id="slot3" class="form-select form-control-custom mb-2"><option value="">-- Slot 3 --</option></select>
@@ -244,13 +231,8 @@ HTML_TEMPLATE = """
 async function fazerLogin() {
     const user = document.getElementById('user').value;
     const pass = document.getElementById('pass').value;
-    
-    const res = await fetch("/api/login", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user, password: pass })
-    });
+    const res = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password: pass }) });
     const data = await res.json();
-    
     if (data.success) {
         document.getElementById('login-view').classList.add('d-none');
         document.getElementById('app-view').classList.remove('d-none');
@@ -262,23 +244,17 @@ async function fazerLogin() {
 }
 
 function fazerLogout() {
-    document.getElementById('app-view').classList.add('d-none');
-    document.getElementById('login-view').classList.remove('d-none');
-    document.getElementById('user').value = '';
-    document.getElementById('pass').value = '';
-    document.getElementById('loginError').classList.add('d-none');
-    document.getElementById('btnAdmin').classList.add('d-none');
+    document.getElementById('app-view').classList.add('d-none'); document.getElementById('login-view').classList.remove('d-none');
+    document.getElementById('user').value = ''; document.getElementById('pass').value = '';
+    document.getElementById('loginError').classList.add('d-none'); document.getElementById('btnAdmin').classList.add('d-none');
     novaTriagem();
 }
 
 function novaTriagem() {
-    document.getElementById('idade').value = '65';
-    document.getElementById('peso').value = '70';
-    document.getElementById('altura').value = '170';
-    document.getElementById('creatinina').value = '1.2';
-    document.getElementById('pdfFile').value = '';
-    document.getElementById('outrosMedicamentos').value = '';
-    document.getElementById('parecerSoap').value = '';
+    document.getElementById('idade').value = '65'; document.getElementById('peso').value = '70';
+    document.getElementById('altura').value = '170'; document.getElementById('creatinina').value = '1.2';
+    document.getElementById('pacienteAcamado').checked = false;
+    document.getElementById('pdfFile').value = ''; document.getElementById('textoPrescricao').value = ''; document.getElementById('parecerSoap').value = '';
     document.getElementById('valClcr').innerHTML = '-- <span style="font-size:1rem;">mL/min</span>';
     document.getElementById('navClcr').innerText = '-- mL/min';
     document.getElementById('valPesoAdotado').innerText = '--';
@@ -286,23 +262,15 @@ function novaTriagem() {
 }
 
 async function criarUsuario() {
-    const user = document.getElementById('novoUser').value;
-    const pass = document.getElementById('novoPass').value;
+    const user = document.getElementById('novoUser').value; const pass = document.getElementById('novoPass').value;
     if (!user || !pass) return alert("Preencha ambos os campos.");
-    
-    const res = await fetch("/api/usuarios", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user, password: pass })
-    });
+    const res = await fetch("/api/usuarios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password: pass }) });
     const data = await res.json();
     const msg = document.getElementById('adminMsg');
     if (data.success) {
-        msg.className = "small fw-bold mb-2 text-success";
-        msg.innerText = "Usuário cadastrado com sucesso!";
+        msg.className = "small fw-bold mb-2 text-success"; msg.innerText = "Usuário cadastrado com sucesso!";
         document.getElementById('novoUser').value = ''; document.getElementById('novoPass').value = '';
-    } else {
-        msg.className = "small fw-bold mb-2 text-danger"; msg.innerText = data.msg;
-    }
+    } else { msg.className = "small fw-bold mb-2 text-danger"; msg.innerText = data.msg; }
 }
 
 async function carregarCatalogo() {
@@ -310,13 +278,9 @@ async function carregarCatalogo() {
         const res = await fetch("/api/antimicrobianos");
         const catalogo = await res.json();
         const selects = [document.getElementById("slot1"), document.getElementById("slot2"), document.getElementById("slot3"), document.getElementById("slot4")];
-        
         selects.forEach(select => {
             if(select.options.length <= 1) { 
-                catalogo.forEach(item => {
-                    const opt = document.createElement("option"); opt.value = item.nome; opt.innerText = item.nome;
-                    select.appendChild(opt);
-                });
+                catalogo.forEach(item => { const opt = document.createElement("option"); opt.value = item.nome; opt.innerText = item.nome; select.appendChild(opt); });
             }
         });
     } catch(e) {}
@@ -328,23 +292,29 @@ async function extrairPdf() {
     const formData = new FormData(); formData.append("file", fileInput.files[0]);
     const res = await fetch("/api/extrair-pdf", { method: "POST", body: formData });
     const data = await res.json();
-    document.getElementById("outrosMedicamentos").value = data.texto_anonimizado;
+    
+    // Distribuição Automática
+    document.getElementById("textoPrescricao").value = data.texto_anonimizado;
+    
+    // Preenche os Slots com os ATBs encontrados
+    const slots = ["slot1", "slot2", "slot3", "slot4"];
+    for (let i = 0; i < data.atbs.length && i < 4; i++) {
+        document.getElementById(slots[i]).value = data.atbs[i];
+    }
 }
 
 async function gerarAnalise() {
     const atbs = [document.getElementById("slot1").value, document.getElementById("slot2").value, document.getElementById("slot3").value, document.getElementById("slot4").value].filter(i => i !== "");
-    const outros = document.getElementById("outrosMedicamentos").value.split(",").map(s => s.trim()).filter(s => s.length > 0 && s.length < 50);
-
+    
     const payload = {
         sexo: document.getElementById("sexo").value,
         idade: parseInt(document.getElementById("idade").value) || 0,
         peso: parseFloat(document.getElementById("peso").value) || 0,
         altura: parseFloat(document.getElementById("altura").value) || 0,
         creatinina: parseFloat(document.getElementById("creatinina").value) || 0,
+        acamado: document.getElementById("pacienteAcamado").checked,
         antimicrobianos: atbs,
-        outros_medicamentos: outros,
-        tev_ativo: document.getElementById("profilaxiaTev").checked,
-        lamg_ativo: document.getElementById("profilaxiaLamg").checked
+        texto_prescricao: document.getElementById("textoPrescricao").value
     };
 
     const res = await fetch("/api/avaliar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -373,10 +343,9 @@ class AvaliacaoPayload(BaseModel):
     peso: float
     altura: float
     creatinina: float
+    acamado: bool
     antimicrobianos: List[str]
-    outros_medicamentos: List[str] = []
-    tev_ativo: bool
-    lamg_ativo: bool
+    texto_prescricao: str
 
 class LoginData(BaseModel):
     username: str
@@ -388,8 +357,7 @@ class NovoUsuario(BaseModel):
     role: str = "user"
 
 @app.get("/", response_class=HTMLResponse)
-def index():
-    return HTML_TEMPLATE
+def index(): return HTML_TEMPLATE
 
 @app.post("/api/login")
 def login(data: LoginData):
@@ -410,8 +378,7 @@ def criar_usuario(data: NovoUsuario):
         conn.commit()
         conn.close()
         return {"success": True}
-    except:
-        return {"success": False, "msg": "Nome de usuário já existe!"}
+    except: return {"success": False, "msg": "Nome de usuário já existe!"}
 
 @app.get("/api/antimicrobianos")
 def get_antimicrobianos():
@@ -422,7 +389,7 @@ def get_antimicrobianos():
         rows = cursor.fetchall()
     except sqlite3.OperationalError:
         conn.close()
-        return [{"id": 0, "nome": "Base não atualizada. Rode setup_db.py", "nome_generico": "Erro"}]
+        return [{"id": 0, "nome": "Base não atualizada.", "nome_generico": "Erro"}]
     
     items = []
     for r in rows:
@@ -434,73 +401,114 @@ def get_antimicrobianos():
 @app.post("/api/extrair-pdf")
 async def processar_pdf(file: UploadFile = File(...)):
     reader = pypdf.PdfReader(file.file)
-    texto = "".join([p.extract_text() or "" for p in reader.pages])
-    return {"texto_anonimizado": anonimizar(texto)}
+    texto_bruto = "".join([p.extract_text() or "" for p in reader.pages])
+    texto_anon = anonimizar(texto_bruto)
+    texto_lower = texto_anon.lower()
+    
+    # Busca automática de Antimicrobianos
+    conn = sqlite3.connect("radar_clinico.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT nome_generico, nomes_comerciais FROM antimicrobianos")
+    atbs_db = cursor.fetchall()
+    conn.close()
+    
+    atbs_encontrados = set()
+    for gen, com in atbs_db:
+        nomes_para_buscar = [gen.lower()]
+        if com: nomes_para_buscar.extend([c.strip().lower() for c in com.split(',')])
+        
+        for n in nomes_para_buscar:
+            if n in texto_lower:
+                atbs_encontrados.add(f"{gen} ({com})" if com else gen)
+                break
+
+    return {
+        "texto_anonimizado": texto_anon,
+        "atbs": list(atbs_encontrados)
+    }
 
 @app.post("/api/avaliar")
 def avaliar_paciente(payload: AvaliacaoPayload):
     metricas = calcular_metricas(payload.sexo, payload.idade, payload.peso, payload.altura, payload.creatinina)
     clcr = metricas["clcr"]
+    texto_min = payload.texto_prescricao.lower()
+    
     conn = sqlite3.connect("radar_clinico.db")
     cursor = conn.cursor()
+    
+    # 1. Avaliação de Antimicrobianos
     avaliacoes = []
     farmacotecnias = []
-    todos_farmacos_genericos = []
-    
     for nome_selecionado in payload.antimicrobianos:
         nome_generico = nome_selecionado.split(" (")[0]
-        todos_farmacos_genericos.append(nome_generico)
         cursor.execute("SELECT * FROM antimicrobianos WHERE nome_generico = ?", (nome_generico,))
         row = cursor.fetchone()
         if row:
-            d_padrao, c_30_50, c_10_30, c_menor_10, c_hd, mon, farm = row[3], row[4], row[5], row[6], row[7], row[8], row[9]
+            d_padrao, c_30_50, c_10_30, c_menor_10, farm = row[3], row[4], row[5], row[6], row[9]
             if clcr >= 50: poso = f"{d_padrao} (Dose plena preservada)"
             elif 30 <= clcr < 50: poso = c_30_50
             elif 10 <= clcr < 30: poso = c_10_30
             else: poso = c_menor_10
-            avaliacoes.append({"nome": nome_generico, "posologia": poso, "monitor": mon})
+            avaliacoes.append({"nome": nome_generico, "posologia": poso})
             farmacotecnias.append(f"• {nome_generico}: {farm}")
 
-    todos_farmacos_genericos.extend(payload.outros_medicamentos)
-    interacoes_encontradas = []
-    for i in range(len(todos_farmacos_genericos)):
-        for j in range(i + 1, len(todos_farmacos_genericos)):
-            d1, d2 = todos_farmacos_genericos[i].strip(), todos_farmacos_genericos[j].strip()
-            if not d1 or not d2: continue
-            cursor.execute("""
-                SELECT gravidade, mecanismo, conduta FROM interacoes 
-                WHERE (LOWER(droga_a) = LOWER(?) AND LOWER(droga_b) = LOWER(?)) OR (LOWER(droga_a) = LOWER(?) AND LOWER(droga_b) = LOWER(?))
-            """, (d1, d2, d2, d1))
-            res = cursor.fetchone()
-            if res: interacoes_encontradas.append({"par": f"{d1} + {d2}", "gravidade": res[0], "detalhe": res[1], "conduta": res[2]})
+    # 2. Motor de Incompatibilidades Farmacotécnicas (Leitura de Contexto Linha a Linha)
+    incompatibilidades_encontradas = set()
+    cursor.execute("SELECT farmaco, condicao, alerta FROM regras_farmacotecnicas")
+    regras = cursor.fetchall()
+    
+    linhas_prescricao = texto_min.split('\n')
+    for farmaco, condicao, alerta in regras:
+        for linha in linhas_prescricao:
+            if farmaco.lower() in linha and condicao.lower() in linha:
+                incompatibilidades_encontradas.add(f"[ALERTA FARMACOTÉCNICO] {farmaco.upper()} + {condicao.upper()}: {alerta}")
+
     conn.close()
 
+    # 3. Filtro Clínico de Exceção (TEV e LAMG)
+    tem_heparina = "heparina" in texto_min or "enoxaparina" in texto_min or "versan" in texto_min or "clexane" in texto_min
+    tem_ibp = "omeprazol" in texto_min or "pantoprazol" in texto_min or "esomeprazol" in texto_min
+    
+    alerta_tev = ""
+    if not tem_heparina and (payload.idade >= 60 or payload.acamado):
+        alerta_tev = "ALERTA [!]: Paciente de risco (Idoso/Acamado) SEM profilaxia anticoagulante. Avaliar omissão ou contraindicação (sangramento, plaquetas)."
+    else:
+        alerta_tev = "Conforme (Baixo risco ou Profilaxia já prescrita)."
+        
+    alerta_lamg = ""
+    if tem_ibp:
+        alerta_lamg = "ALERTA [!]: Protetor gástrico prescrito. Reavaliar real indicação para prevenir desprescrição inadequada."
+    else:
+        alerta_lamg = "Conforme (Sem protetor gástrico prescrito)."
+
+    # 4. Montagem Final do SOAP
     soap = [
         "=== EVOLUÇÃO FARMACÊUTICA // RADAR CLÍNICO ===",
-        "[S] SUBJETIVO: Acompanhamento da farmacoterapia do leito. Triagem de prescrição médica ativa.",
+        "[S] SUBJETIVO: Acompanhamento da farmacoterapia do leito. Triagem automática de prescrição médica.",
         "[O] OBJETIVO:",
         f"    - Idade: {payload.idade} anos | Sexo: {payload.sexo.upper()} | Peso Real: {payload.peso} kg | Altura: {payload.altura} cm",
         f"    - Peso Adotado para Ajuste: {metricas['peso_adotado']} kg | IMC: {metricas['imc']} kg/m²",
         f"    - Função Renal (Cockcroft-Gault): {metricas['clcr']} mL/min",
         "[A] AVALIAÇÃO FARMACÊUTICA:"
     ]
+    
     if avaliacoes:
         soap.append("    1. Terapêutica Antimicrobiana & Ajuste Renal:")
-        for a in avaliacoes: soap.append(f"       * {a['nome']}: Posologia sugerida para ClCr {clcr} mL/min -> {a['posologia']}")
-    else: soap.append("    1. Nenhum antimicrobiano ativo selecionado para ajuste de dose.")
+        for a in avaliacoes: soap.append(f"       * {a['nome']}: Sugestão p/ ClCr {clcr} mL/min -> {a['posologia']}")
+    else: soap.append("    1. Nenhum antimicrobiano detectado para ajuste de dose.")
     
-    soap.append("    2. Profilaxias Institucionais:")
-    soap.append(f"       * TEV: {'Conforme.' if payload.tev_ativo else 'ALERTA: Ausência detectada (avaliar Pádua/Caprini).'}")
-    soap.append(f"       * LAMG: {'Conforme.' if payload.lamg_ativo else 'NOTA: Sem profilaxia prescrita.'}")
+    soap.append("    2. Profilaxias Institucionais (Filtro por Exceção):")
+    soap.append(f"       * TEV: {alerta_tev}")
+    soap.append(f"       * LAMG: {alerta_lamg}")
 
-    if interacoes_encontradas:
-        soap.append("    3. Interações Medicamentosas Relevantes:")
-        for inter in interacoes_encontradas: soap.append(f"       * [{inter['gravidade']}] {inter['par']}: {inter['conduta']}")
+    if incompatibilidades_encontradas:
+        soap.append("    3. Incompatibilidades e Vias de Administração Detectadas:")
+        for inc in incompatibilidades_encontradas: soap.append(f"       * {inc}")
 
     soap.append("[P] PLANO DE CUIDADO:")
-    soap.append("    1. Sugerir à equipe assistente a adequação clínica e posológica conforme apontado.")
+    soap.append("    1. Sugerir adequação clínica/posológica à equipe médica conforme achados.")
     if farmacotecnias:
-        soap.append("    2. Orientações Farmacotécnicas e Administração:")
+        soap.append("    2. Orientações de Reconstituição e Diluição:")
         for f in farmacotecnias: soap.append(f"       {f}")
 
     return {"metricas": metricas, "soap": "\n".join(soap)}
