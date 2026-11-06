@@ -13,6 +13,26 @@ import uvicorn
 
 app = FastAPI(title="Radar Clínico", description="Sistema de Apoio à Decisão Farmacêutica")
 
+# ==============================================================================
+# AUTO-REPARAÇÃO DA BASE DE DADOS (Resolve o erro de login no Render)
+# ==============================================================================
+@app.on_event("startup")
+def verificar_base_dados():
+    try:
+        conn = sqlite3.connect("radar_clinico.db")
+        cursor = conn.cursor()
+        # Tenta ler a tabela de senhas. Se não existir, vai gerar um erro.
+        cursor.execute("SELECT 1 FROM usuarios")
+        conn.close()
+    except sqlite3.OperationalError:
+        print("Base de dados desatualizada no Render. A executar setup_db.py automaticamente...")
+        try:
+            import setup_db
+            setup_db.setup_database()
+        except Exception as e:
+            print("Erro ao forçar a base de dados:", e)
+
+# Montar pasta static
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -231,14 +251,20 @@ HTML_TEMPLATE = """
 async function fazerLogin() {
     const user = document.getElementById('user').value;
     const pass = document.getElementById('pass').value;
-    const res = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password: pass }) });
-    const data = await res.json();
-    if (data.success) {
-        document.getElementById('login-view').classList.add('d-none');
-        document.getElementById('app-view').classList.remove('d-none');
-        if (data.role === 'admin') document.getElementById('btnAdmin').classList.remove('d-none');
-        carregarCatalogo();
-    } else {
+    
+    try {
+        const res = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password: pass }) });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('login-view').classList.add('d-none');
+            document.getElementById('app-view').classList.remove('d-none');
+            if (data.role === 'admin') document.getElementById('btnAdmin').classList.remove('d-none');
+            carregarCatalogo();
+        } else {
+            document.getElementById('loginError').classList.remove('d-none');
+        }
+    } catch (e) {
+        document.getElementById('loginError').innerText = "Erro de conexão com o banco. Aguarde um momento e tente novamente.";
         document.getElementById('loginError').classList.remove('d-none');
     }
 }
@@ -361,13 +387,17 @@ def index(): return HTML_TEMPLATE
 
 @app.post("/api/login")
 def login(data: LoginData):
-    conn = sqlite3.connect("radar_clinico.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT role FROM usuarios WHERE username = ? AND password = ?", (data.username, data.password))
-    user = cursor.fetchone()
-    conn.close()
-    if user: return {"success": True, "role": user[0]}
-    return {"success": False}
+    try:
+        conn = sqlite3.connect("radar_clinico.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT role FROM usuarios WHERE username = ? AND password = ?", (data.username, data.password))
+        user = cursor.fetchone()
+        conn.close()
+        if user: return {"success": True, "role": user[0]}
+        return {"success": False}
+    except Exception as e:
+        # Se a tabela ainda não existir no exacto momento, avisa para tentar de novo
+        return {"success": False, "msg": "Base de dados a atualizar. Tente de novo em 5 segundos."}
 
 @app.post("/api/usuarios")
 def criar_usuario(data: NovoUsuario):
@@ -389,7 +419,7 @@ def get_antimicrobianos():
         rows = cursor.fetchall()
     except sqlite3.OperationalError:
         conn.close()
-        return [{"id": 0, "nome": "Base não atualizada.", "nome_generico": "Erro"}]
+        return [{"id": 0, "nome": "A carregar base...", "nome_generico": "Aguarde"}]
     
     items = []
     for r in rows:
@@ -452,7 +482,7 @@ def avaliar_paciente(payload: AvaliacaoPayload):
             avaliacoes.append({"nome": nome_generico, "posologia": poso})
             farmacotecnias.append(f"• {nome_generico}: {farm}")
 
-    # 2. Motor de Incompatibilidades Farmacotécnicas (Leitura de Contexto Linha a Linha)
+    # 2. Motor de Incompatibilidades Farmacotécnicas
     incompatibilidades_encontradas = set()
     cursor.execute("SELECT farmaco, condicao, alerta FROM regras_farmacotecnicas")
     regras = cursor.fetchall()
@@ -471,13 +501,13 @@ def avaliar_paciente(payload: AvaliacaoPayload):
     
     alerta_tev = ""
     if not tem_heparina and (payload.idade >= 60 or payload.acamado):
-        alerta_tev = "ALERTA [!]: Paciente de risco (Idoso/Acamado) SEM profilaxia anticoagulante. Avaliar omissão ou contraindicação (sangramento, plaquetas)."
+        alerta_tev = "ALERTA [!]: Paciente de risco (Idoso/Acamado) SEM profilaxia anticoagulante prescrita. Avaliar omissão ou contraindicação."
     else:
         alerta_tev = "Conforme (Baixo risco ou Profilaxia já prescrita)."
         
     alerta_lamg = ""
     if tem_ibp:
-        alerta_lamg = "ALERTA [!]: Protetor gástrico prescrito. Reavaliar real indicação para prevenir desprescrição inadequada."
+        alerta_lamg = "ALERTA [!]: Protetor gástrico ativo. Reavaliar real indicação para prevenir desprescrição inadequada."
     else:
         alerta_lamg = "Conforme (Sem protetor gástrico prescrito)."
 
