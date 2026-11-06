@@ -14,25 +14,23 @@ import uvicorn
 app = FastAPI(title="Radar Clínico", description="Sistema de Apoio à Decisão Farmacêutica")
 
 # ==============================================================================
-# AUTO-REPARAÇÃO DA BASE DE DADOS (Resolve o erro de login no Render)
+# AUTO-REPARAÇÃO DA BASE DE DADOS
 # ==============================================================================
 @app.on_event("startup")
 def verificar_base_dados():
     try:
         conn = sqlite3.connect("radar_clinico.db")
         cursor = conn.cursor()
-        # Tenta ler a tabela de senhas. Se não existir, vai gerar um erro.
         cursor.execute("SELECT 1 FROM usuarios")
         conn.close()
     except sqlite3.OperationalError:
-        print("Base de dados desatualizada no Render. A executar setup_db.py automaticamente...")
+        print("Base de dados desatualizada. A executar setup_db.py automaticamente...")
         try:
             import setup_db
             setup_db.setup_database()
         except Exception as e:
             print("Erro ao forçar a base de dados:", e)
 
-# Montar pasta static
 if os.path.isdir("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -86,28 +84,44 @@ HTML_TEMPLATE = """
             --brand-primary: #0056b3; 
             --brand-light: #e0f2fe;
             --brand-dark: #003d82;
+            --brand-nova-triagem: #0dcaf0; /* Azul claro */
             --bg-login: #3b4252;
             --bg-dashboard: #f3f4f6;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-dashboard); color: #374151; }
         
+        /* LOGIN */
         #login-view { background-color: var(--bg-login); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
         .login-card { background: #fff; width: 100%; max-width: 400px; border-radius: 12px; padding: 2.5rem; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         .login-logo-box { background: #f8fafc; border-radius: 12px; padding: 15px; display: inline-block; margin-bottom: 15px; }
         .login-logo { height: 80px; object-fit: contain; }
         .badge-acesso { background-color: var(--brand-light); color: var(--brand-primary); font-weight: 700; letter-spacing: 0.5px; font-size: 0.75rem; padding: 6px 12px; border-radius: 20px; }
+        
+        /* NAVBAR TIPO RADAR BEERS */
+        .navbar-radar { background-color: var(--brand-primary); padding: 8px 24px; min-height: 64px; }
+        .nav-logo-box { background: white; border-radius: 8px; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; padding: 4px; flex-shrink: 0; }
+        .nav-logo { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+        .btn-nova-triagem { background-color: var(--brand-nova-triagem); color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 0.85rem; letter-spacing: 0.5px; text-transform: uppercase; font-weight: 700; }
+        .btn-nova-triagem:hover { background-color: #0bacce; color: white; }
+        
+        .nav-metric-box { text-align: right; line-height: 1.2; }
+        .nav-metric-label { font-size: 0.65rem; font-weight: 800; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.5px; }
+        .nav-metric-value { font-size: 1.05rem; font-weight: 800; color: white; }
+        .nav-alert-value { font-size: 1.05rem; font-weight: 800; color: #ffc107; } /* Amarelo para os alertas */
+        
+        .btn-admin-nav { background-color: rgba(0,0,0,0.25); color: white; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 8px 16px; font-size: 0.85rem; font-weight: 700; }
+        .btn-admin-nav:hover { background-color: rgba(0,0,0,0.4); color: white; }
+        .btn-sair { background-color: #dc3545; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 0.85rem; font-weight: 700; }
+        .btn-sair:hover { background-color: #bb2d3b; color: white; }
+
+        /* UTILITARIOS & COMPONENTES */
         .form-label-custom { font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
         .form-control-custom { border-radius: 8px; border: 1px solid #d1d5db; padding: 10px 15px; }
-        .form-control-custom:focus { border-color: var(--brand-primary); box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.15); }
         .btn-brand { background-color: var(--brand-primary); color: white; border: none; border-radius: 8px; font-weight: 600; padding: 10px 15px; }
         .btn-brand:hover { background-color: var(--brand-dark); color: white; }
-
-        .navbar-radar { background-color: var(--brand-primary); padding: 10px 20px; }
-        .nav-logo { height: 35px; background: white; padding: 4px; border-radius: 6px; }
         .card-dash { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; background: white; border-top: 4px solid var(--brand-primary); }
         .card-title-dash { font-size: 0.9rem; font-weight: 700; color: var(--brand-primary); text-transform: uppercase; margin-bottom: 1.2rem; display: flex; align-items: center; }
         .step-number { background: var(--brand-light); color: var(--brand-primary); width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; margin-right: 10px; }
-        
         .metric-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; height: 100%; }
         .metric-value { font-size: 1.8rem; font-weight: 800; color: var(--brand-primary); margin: 5px 0; }
         .soap-output { font-family: 'Consolas', monospace; font-size: 0.9rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; padding: 15px; width: 100%; min-height: 300px; resize: vertical; }
@@ -135,17 +149,29 @@ HTML_TEMPLATE = """
 <!-- DASHBOARD -->
 <div id="app-view" class="d-none">
     <nav class="navbar navbar-radar d-flex justify-content-between align-items-center">
+        <!-- Esquerda -->
         <div class="d-flex align-items-center gap-3">
-            <img src="/static/logo.jpg" class="nav-logo" alt="Logo" onerror="this.style.display='none'">
-            <button class="btn btn-sm btn-light fw-bold text-primary px-3 rounded-pill" onclick="novaTriagem()"><i class="bi bi-arrow-clockwise"></i> NOVA TRIAGEM</button>
-            <button id="btnAdmin" class="btn btn-sm btn-outline-light fw-bold d-none" data-bs-toggle="modal" data-bs-target="#adminModal"><i class="bi bi-people-fill"></i> ADMIN</button>
-        </div>
-        <div class="d-flex align-items-center gap-4">
-            <div class="text-end">
-                <div class="text-white-50" style="font-size: 0.7rem; font-weight: 700; letter-spacing: 1px;">CLCR CALCULADO</div>
-                <div class="text-white fw-bold" id="navClcr">-- mL/min</div>
+            <div class="nav-logo-box">
+                <img src="/static/logo.jpg" class="nav-logo" alt="Logo" onerror="this.style.display='none'">
             </div>
-            <button class="btn btn-outline-light btn-sm fw-bold px-3" onclick="fazerLogout()"><i class="bi bi-box-arrow-right"></i> Sair</button>
+            <button class="btn-nova-triagem" onclick="novaTriagem()"><i class="bi bi-arrow-clockwise me-1"></i> Nova Triagem</button>
+        </div>
+        <!-- Direita -->
+        <div class="d-flex align-items-center gap-4">
+            <div class="d-flex align-items-center gap-4 me-2">
+                <div class="nav-metric-box">
+                    <div class="nav-metric-label">CLCR Calculado</div>
+                    <div class="nav-metric-value" id="navClcr">-- mL/min</div>
+                </div>
+                <div class="nav-metric-box">
+                    <div class="nav-metric-label">Alertas Gerais</div>
+                    <div class="nav-alert-value" id="navAlertas">0</div>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button id="btnAdmin" class="btn-admin-nav d-none" data-bs-toggle="modal" data-bs-target="#adminModal"><i class="bi bi-person me-1"></i> ADMIN (ADMIN)</button>
+                <button class="btn-sair" onclick="fazerLogout()"><i class="bi bi-box-arrow-right me-1"></i> Sair</button>
+            </div>
         </div>
     </nav>
 
@@ -251,7 +277,6 @@ HTML_TEMPLATE = """
 async function fazerLogin() {
     const user = document.getElementById('user').value;
     const pass = document.getElementById('pass').value;
-    
     try {
         const res = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: user, password: pass }) });
         const data = await res.json();
@@ -283,6 +308,7 @@ function novaTriagem() {
     document.getElementById('pdfFile').value = ''; document.getElementById('textoPrescricao').value = ''; document.getElementById('parecerSoap').value = '';
     document.getElementById('valClcr').innerHTML = '-- <span style="font-size:1rem;">mL/min</span>';
     document.getElementById('navClcr').innerText = '-- mL/min';
+    document.getElementById('navAlertas').innerText = '0';
     document.getElementById('valPesoAdotado').innerText = '--';
     ['slot1', 'slot2', 'slot3', 'slot4'].forEach(id => document.getElementById(id).value = '');
 }
@@ -318,11 +344,8 @@ async function extrairPdf() {
     const formData = new FormData(); formData.append("file", fileInput.files[0]);
     const res = await fetch("/api/extrair-pdf", { method: "POST", body: formData });
     const data = await res.json();
-    
-    // Distribuição Automática
     document.getElementById("textoPrescricao").value = data.texto_anonimizado;
     
-    // Preenche os Slots com os ATBs encontrados
     const slots = ["slot1", "slot2", "slot3", "slot4"];
     for (let i = 0; i < data.atbs.length && i < 4; i++) {
         document.getElementById(slots[i]).value = data.atbs[i];
@@ -331,7 +354,6 @@ async function extrairPdf() {
 
 async function gerarAnalise() {
     const atbs = [document.getElementById("slot1").value, document.getElementById("slot2").value, document.getElementById("slot3").value, document.getElementById("slot4").value].filter(i => i !== "");
-    
     const payload = {
         sexo: document.getElementById("sexo").value,
         idade: parseInt(document.getElementById("idade").value) || 0,
@@ -348,6 +370,7 @@ async function gerarAnalise() {
 
     document.getElementById("valClcr").innerHTML = data.metricas.clcr + ' <span style="font-size:1rem;">mL/min</span>';
     document.getElementById("navClcr").innerText = data.metricas.clcr + " mL/min";
+    document.getElementById("navAlertas").innerText = data.alertas_count;
     document.getElementById("valPesoAdotado").innerText = data.metricas.peso_adotado;
     document.getElementById("parecerSoap").value = data.soap;
 }
@@ -396,8 +419,7 @@ def login(data: LoginData):
         if user: return {"success": True, "role": user[0]}
         return {"success": False}
     except Exception as e:
-        # Se a tabela ainda não existir no exacto momento, avisa para tentar de novo
-        return {"success": False, "msg": "Base de dados a atualizar. Tente de novo em 5 segundos."}
+        return {"success": False, "msg": "A atualizar banco."}
 
 @app.post("/api/usuarios")
 def criar_usuario(data: NovoUsuario):
@@ -419,7 +441,7 @@ def get_antimicrobianos():
         rows = cursor.fetchall()
     except sqlite3.OperationalError:
         conn.close()
-        return [{"id": 0, "nome": "A carregar base...", "nome_generico": "Aguarde"}]
+        return [{"id": 0, "nome": "A carregar...", "nome_generico": "Aguarde"}]
     
     items = []
     for r in rows:
@@ -435,7 +457,6 @@ async def processar_pdf(file: UploadFile = File(...)):
     texto_anon = anonimizar(texto_bruto)
     texto_lower = texto_anon.lower()
     
-    # Busca automática de Antimicrobianos
     conn = sqlite3.connect("radar_clinico.db")
     cursor = conn.cursor()
     cursor.execute("SELECT nome_generico, nomes_comerciais FROM antimicrobianos")
@@ -446,27 +467,23 @@ async def processar_pdf(file: UploadFile = File(...)):
     for gen, com in atbs_db:
         nomes_para_buscar = [gen.lower()]
         if com: nomes_para_buscar.extend([c.strip().lower() for c in com.split(',')])
-        
         for n in nomes_para_buscar:
             if n in texto_lower:
                 atbs_encontrados.add(f"{gen} ({com})" if com else gen)
                 break
 
-    return {
-        "texto_anonimizado": texto_anon,
-        "atbs": list(atbs_encontrados)
-    }
+    return {"texto_anonimizado": texto_anon, "atbs": list(atbs_encontrados)}
 
 @app.post("/api/avaliar")
 def avaliar_paciente(payload: AvaliacaoPayload):
     metricas = calcular_metricas(payload.sexo, payload.idade, payload.peso, payload.altura, payload.creatinina)
     clcr = metricas["clcr"]
     texto_min = payload.texto_prescricao.lower()
+    alertas_count = 0
     
     conn = sqlite3.connect("radar_clinico.db")
     cursor = conn.cursor()
     
-    # 1. Avaliação de Antimicrobianos
     avaliacoes = []
     farmacotecnias = []
     for nome_selecionado in payload.antimicrobianos:
@@ -482,36 +499,35 @@ def avaliar_paciente(payload: AvaliacaoPayload):
             avaliacoes.append({"nome": nome_generico, "posologia": poso})
             farmacotecnias.append(f"• {nome_generico}: {farm}")
 
-    # 2. Motor de Incompatibilidades Farmacotécnicas
     incompatibilidades_encontradas = set()
     cursor.execute("SELECT farmaco, condicao, alerta FROM regras_farmacotecnicas")
     regras = cursor.fetchall()
-    
     linhas_prescricao = texto_min.split('\n')
     for farmaco, condicao, alerta in regras:
         for linha in linhas_prescricao:
             if farmaco.lower() in linha and condicao.lower() in linha:
                 incompatibilidades_encontradas.add(f"[ALERTA FARMACOTÉCNICO] {farmaco.upper()} + {condicao.upper()}: {alerta}")
-
+                
+    alertas_count += len(incompatibilidades_encontradas)
     conn.close()
 
-    # 3. Filtro Clínico de Exceção (TEV e LAMG)
     tem_heparina = "heparina" in texto_min or "enoxaparina" in texto_min or "versan" in texto_min or "clexane" in texto_min
     tem_ibp = "omeprazol" in texto_min or "pantoprazol" in texto_min or "esomeprazol" in texto_min
     
     alerta_tev = ""
     if not tem_heparina and (payload.idade >= 60 or payload.acamado):
         alerta_tev = "ALERTA [!]: Paciente de risco (Idoso/Acamado) SEM profilaxia anticoagulante prescrita. Avaliar omissão ou contraindicação."
+        alertas_count += 1
     else:
         alerta_tev = "Conforme (Baixo risco ou Profilaxia já prescrita)."
         
     alerta_lamg = ""
     if tem_ibp:
         alerta_lamg = "ALERTA [!]: Protetor gástrico ativo. Reavaliar real indicação para prevenir desprescrição inadequada."
+        alertas_count += 1
     else:
         alerta_lamg = "Conforme (Sem protetor gástrico prescrito)."
 
-    # 4. Montagem Final do SOAP
     soap = [
         "=== EVOLUÇÃO FARMACÊUTICA // RADAR CLÍNICO ===",
         "[S] SUBJETIVO: Acompanhamento da farmacoterapia do leito. Triagem automática de prescrição médica.",
@@ -541,7 +557,7 @@ def avaliar_paciente(payload: AvaliacaoPayload):
         soap.append("    2. Orientações de Reconstituição e Diluição:")
         for f in farmacotecnias: soap.append(f"       {f}")
 
-    return {"metricas": metricas, "soap": "\n".join(soap)}
+    return {"metricas": metricas, "soap": "\n".join(soap), "alertas_count": alertas_count}
 
 if __name__ == "__main__":
     threading.Timer(1.5, lambda: webbrowser.open("http://127.0.0.1:8000")).start()
