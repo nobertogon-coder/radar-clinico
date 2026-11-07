@@ -9,11 +9,11 @@ def setup_database():
     conn = sqlite3.connect("radar_clinico.db")
     cursor = conn.cursor()
     
-    # 1. Usuários
+    # 1. Usuários (AGORA COM AS NOVAS CREDENCIAIS: Noberto / admin123)
     cursor.execute("CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, role TEXT NOT NULL)")
-    cursor.execute("INSERT OR IGNORE INTO usuarios (username, password, role) VALUES ('admin', 'admin', 'admin')")
+    cursor.execute("INSERT OR IGNORE INTO usuarios (username, password, role) VALUES ('Noberto', 'admin123', 'admin')")
 
-    # 2. Antimicrobianos (AGORA COM DOSES NUMÉRICAS)
+    # 2. Antimicrobianos
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS antimicrobianos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +67,7 @@ def setup_database():
     ]
     cursor.executemany("INSERT OR IGNORE INTO regras_farmacotecnicas (farmaco, condicao, alerta) VALUES (?, ?, ?)", regras_farmaco)
 
-    # 5. Comorbidades e Riscos (NOVO)
+    # 5. Comorbidades e Riscos
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS comorbidades_risco (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
